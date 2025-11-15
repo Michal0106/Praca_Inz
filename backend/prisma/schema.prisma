@@ -1,0 +1,124 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String?  @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  stravaId  String?  @unique
+  garminId  String?  @unique
+  
+  activities Activity[]
+  userStats  UserStats?
+}
+
+model Activity {
+  id               String   @id @default(uuid())
+  userId           String
+  externalId       String
+  source           DataSource
+  name             String
+  type             String
+  startDate        DateTime
+  duration         Int
+  distance         Float?
+  averageHeartRate Int?
+  maxHeartRate     Int?
+  averageSpeed     Float?
+  maxSpeed         Float?
+  elevationGain    Float?
+  calories         Int?
+  averagePower     Int?
+  maxPower         Int?
+  trainingLoad     Float?
+  intensity        String?
+  createdAt        DateTime @default(now())
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([externalId, source])
+  @@index([userId])
+  @@index([startDate])
+}
+
+model UserStats {
+  id                    String   @id @default(uuid())
+  userId                String   @unique
+  totalActivities       Int      @default(0)
+  totalDistance         Float    @default(0)
+  totalDuration         Int      @default(0)
+  totalElevationGain    Float    @default(0)
+  averageIntensity      Float?
+  longestActivityId     String?
+  lastSyncDate          DateTime?
+  updatedAt             DateTime @updatedAt
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model TrainingPlanTemplate {
+  id          String   @id @default(uuid())
+  name        String
+  description String
+  level       Level
+  weeklyHours Int
+  daysPerWeek Int
+  focusType   FocusType
+  duration    Int
+  weeks       TrainingWeek[]
+  createdAt   DateTime @default(now())
+  
+  @@index([level])
+  @@index([focusType])
+}
+
+model TrainingWeek {
+  id         String   @id @default(uuid())
+  templateId String
+  weekNumber Int
+  sessions   TrainingSession[]
+  
+  template TrainingPlanTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  
+  @@unique([templateId, weekNumber])
+}
+
+model TrainingSession {
+  id          String   @id @default(uuid())
+  weekId      String
+  dayOfWeek   Int
+  sessionType String
+  duration    Int
+  intensity   String
+  description String
+  
+  week TrainingWeek @relation(fields: [weekId], references: [id], onDelete: Cascade)
+}
+
+enum DataSource {
+  STRAVA
+  GARMIN
+}
+
+enum Level {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  ELITE
+}
+
+enum FocusType {
+  ENDURANCE
+  STRENGTH
+  SPEED
+  MIXED
+  RECOVERY
+}

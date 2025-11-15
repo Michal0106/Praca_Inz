@@ -1,0 +1,13 @@
+{
+  "name": "training-analytics-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "setup": "chmod +x setup.sh && ./setup.sh",
+    "start": "chmod +x start.sh && ./start.sh",
+    "dev": "chmod +x start.sh && ./start.sh",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "prisma:studio": "cd backend && npm run prisma:studio"
+  }
+}
