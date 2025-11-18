@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Award, TrendingUp, Activity, Calendar, Filter } from 'lucide-react';
+import { Award, TrendingUp, Activity as ActivityIcon } from 'lucide-react';
 import Layout from '../components/Layout';
+import GlobalFilters from '../components/GlobalFilters';
 import ActivityModal from '../components/ActivityModal';
+import { useFilters } from '../context/FilterContext';
 import { dataAPI, activitiesAPI } from '../services/api';
 import './DataPage.css';
 
@@ -11,28 +13,22 @@ function DataPage() {
   const [activities, setActivities] = useState([]);
   const [longestActivity, setLongestActivity] = useState(null);
   const [hardestActivity, setHardestActivity] = useState(null);
-  const [activityTypes, setActivityTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedActivity, setSelectedActivity] = useState(null);
   const [showModal, setShowModal] = useState(false);
   
-  // Filtry
-  const [selectedType, setSelectedType] = useState('');
-  const [dateRange, setDateRange] = useState('30'); // dni
-  const [metric, setMetric] = useState('distance');
-  
   const navigate = useNavigate();
+  const { activityType, dateRange, metric } = useFilters();
 
   useEffect(() => {
     fetchData();
-    fetchActivityTypes();
   }, []);
 
   useEffect(() => {
     if (!loading) {
       fetchFilteredData();
     }
-  }, [selectedType, dateRange, metric]);
+  }, [activityType, dateRange, metric]);
 
   const fetchData = async () => {
     try {
@@ -42,7 +38,22 @@ function DataPage() {
       ]);
 
       setStats(statsRes.data.stats);
-      setActivities(activitiesRes.data.activities || []);
+      
+      // Filtrowane aktywności
+      const params = { limit: 50 };
+      if (activityType !== 'all') {
+        params.type = activityType;
+      }
+      if (dateRange.start) {
+        params.startDate = dateRange.start.toISOString();
+      }
+      if (dateRange.end) {
+        params.endDate = dateRange.end.toISOString();
+      }
+      
+      const filteredActivities = await activitiesAPI.getActivities(params);
+      setActivities(filteredActivities.data.activities || []);
+      
       await fetchFilteredData();
     } catch (error) {
       if (error.response?.status === 401) {
@@ -51,15 +62,6 @@ function DataPage() {
       console.error('Fetch data error:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchActivityTypes = async () => {
-    try {
-      const res = await activitiesAPI.getActivityTypes();
-      setActivityTypes(res.data.types || []);
-    } catch (error) {
-      console.error('Fetch types error:', error);
     }
   };
 
@@ -108,46 +110,7 @@ function DataPage() {
           <h1>Szczegółowe dane</h1>
         </div>
 
-        <div className="filters-section">
-          <div className="filter-group">
-            <label>
-              <Filter size={16} />
-              Typ aktywności
-            </label>
-            <select value={selectedType} onChange={(e) => setSelectedType(e.target.value)}>
-              <option value="">Wszystkie</option>
-              {activityTypes.map(type => (
-                <option key={type} value={type}>{type}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="filter-group">
-            <label>
-              <Calendar size={16} />
-              Okres
-            </label>
-            <select value={dateRange} onChange={(e) => setDateRange(e.target.value)}>
-              <option value="7">Ostatnie 7 dni</option>
-              <option value="30">Ostatnie 30 dni</option>
-              <option value="90">Ostatnie 3 miesiące</option>
-              <option value="180">Ostatnie 6 miesięcy</option>
-              <option value="365">Ostatni rok</option>
-            </select>
-          </div>
-
-          <div className="filter-group">
-            <label>
-              <TrendingUp size={16} />
-              Metryka
-            </label>
-            <select value={metric} onChange={(e) => setMetric(e.target.value)}>
-              <option value="distance">Dystans</option>
-              <option value="duration">Czas trwania</option>
-              <option value="elevationGain">Przewyższenie</option>
-            </select>
-          </div>
-        </div>
+        <GlobalFilters />
 
         <div className="highlights-section">
           <div className="highlight-card clickable" onClick={() => longestActivity && handleActivityClick(longestActivity.id)}>
@@ -178,7 +141,7 @@ function DataPage() {
 
           <div className="highlight-card clickable" onClick={() => hardestActivity && handleActivityClick(hardestActivity.id)}>
             <div className="highlight-icon">
-              <Activity size={40} />
+              <ActivityIcon size={40} />
             </div>
             <h3>Najtrudniejszy trening</h3>
             {hardestActivity ? (

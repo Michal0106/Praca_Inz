@@ -9,15 +9,43 @@ datasource db {
 
 model User {
   id        String   @id @default(uuid())
-  email     String?  @unique
+  email     String   @unique
+  password  String
+  firstName String?
+  lastName  String?
+  isEmailVerified Boolean @default(false)
+  emailVerificationToken String?
+  emailVerificationExpires DateTime?
+  resetPasswordToken String?
+  resetPasswordExpires DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   
   stravaId  String?  @unique
+  stravaAccessToken String?
+  stravaRefreshToken String?
+  stravaTokenExpiresAt DateTime?
+  
   garminId  String?  @unique
   
   activities Activity[]
   userStats  UserStats?
+  fitnessMetrics FitnessMetrics[]
+  achievements Achievement[]
+  refreshTokens RefreshToken[]
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([token])
 }
 
 model Activity {
@@ -40,12 +68,128 @@ model Activity {
   maxPower         Int?
   trainingLoad     Float?
   intensity        String?
+  tss              Float?     // Training Stress Score
+  normalizedPower  Int?       // Normalized Power for cycling
+  intensityFactor  Float?     // IF = NP / FTP
   createdAt        DateTime @default(now())
   
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gpsPoints GpsPoint[]
+  powerCurve PowerCurve?
+  paceDistance PaceDistance?
+  segmentEfforts SegmentEffort[]
+  cluster ActivityCluster?
   
   @@unique([externalId, source])
   @@index([userId])
+  @@index([startDate])
+}
+
+model GpsPoint {
+  id          String   @id @default(uuid())
+  activityId  String
+  latitude    Float
+  longitude   Float
+  altitude    Float?
+  timestamp   DateTime
+  speed       Float?
+  heartRate   Int?
+  power       Int?
+  cadence     Int?
+  
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  
+  @@index([activityId])
+  @@index([timestamp])
+}
+
+model PowerCurve {
+  id          String   @id @default(uuid())
+  activityId  String   @unique
+  userId      String
+  sec5        Float?   // Best 5 seconds power/pace
+  sec30       Float?   // Best 30 seconds
+  min1        Float?   // Best 1 minute
+  min2        Float?   // Best 2 minutes
+  min5        Float?   // Best 5 minutes
+  min10       Float?   // Best 10 minutes
+  min20       Float?   // Best 20 minutes
+  min60       Float?   // Best 60 minutes
+  type        String   // "power" or "pace"
+  createdAt   DateTime @default(now())
+  
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model FitnessMetrics {
+  id          String   @id @default(uuid())
+  userId      String
+  date        DateTime
+  ctl         Float    // Chronic Training Load (42-day)
+  atl         Float    // Acute Training Load (7-day)
+  tsb         Float    // Training Stress Balance
+  rampRate    Float?   // CTL week-over-week change
+  createdAt   DateTime @default(now())
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, date])
+  @@index([userId])
+  @@index([date])
+}
+
+model ActivityCluster {
+  id          String   @id @default(uuid())
+  userId      String
+  activityId  String   @unique
+  cluster     Int      // Cluster number (0-4)
+  pca1        Float    // First principal component
+  pca2        Float    // Second principal component
+  features    Json     // Original features used for clustering
+  createdAt   DateTime @default(now())
+  
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([cluster])
+}
+
+model Segment {
+  id          String   @id @default(uuid())
+  externalId  String   @unique
+  name        String
+  distance    Float
+  avgGrade    Float?
+  startLat    Float
+  startLng    Float
+  endLat      Float
+  endLng      Float
+  createdAt   DateTime @default(now())
+  
+  efforts SegmentEffort[]
+}
+
+model SegmentEffort {
+  id          String   @id @default(uuid())
+  segmentId   String
+  activityId  String
+  userId      String
+  elapsedTime Int      // seconds
+  movingTime  Int      // seconds
+  startDate   DateTime
+  avgPower    Int?
+  avgHr       Int?
+  isPr        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  
+  segment  Segment  @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([segmentId])
   @@index([startDate])
 }
 
@@ -103,6 +247,23 @@ model TrainingSession {
   week TrainingWeek @relation(fields: [weekId], references: [id], onDelete: Cascade)
 }
 
+model PaceDistance {
+  id          String   @id @default(uuid())
+  activityId  String   @unique
+  userId      String
+  km1         Float?   // Best pace for 1 km (min/km)
+  km5         Float?   // Best pace for 5 km
+  km10        Float?   // Best pace for 10 km
+  km21        Float?   // Best pace for half marathon (21.0975 km)
+  km42        Float?   // Best pace for marathon (42.195 km)
+  createdAt   DateTime @default(now())
+  
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([createdAt])
+}
+
 enum DataSource {
   STRAVA
   GARMIN
@@ -121,4 +282,26 @@ enum FocusType {
   SPEED
   MIXED
   RECOVERY
+}
+
+model Achievement {
+  id          String   @id @default(uuid())
+  userId      String
+  type        String   // "STREAK", "DISTANCE", "TIME", "EARLY_BIRD", "CENTURY"
+  name        String
+  description String
+  category    String   // "RUNNING", "CYCLING", "GENERAL"
+  earned      Boolean  @default(false)
+  earnedDate  DateTime?
+  progress    Float    @default(0) // 0-100%
+  targetValue Float?
+  currentValue Float?
+  icon        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([earned])
 }

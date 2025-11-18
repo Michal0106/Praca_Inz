@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import Layout from '../components/Layout';
+import GlobalFilters from '../components/GlobalFilters';
+import { useFilters } from '../context/FilterContext';
 import { analyticsAPI } from '../services/api';
 import './AnalyticsPage.css';
 
@@ -14,18 +16,45 @@ function AnalyticsPage() {
   const [intensityData, setIntensityData] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { period, activityType } = useFilters();
 
   useEffect(() => {
     fetchAnalytics();
-  }, []);
+  }, [period, activityType]);
 
   const fetchAnalytics = async () => {
     try {
+      // Oblicz weeks i months na podstawie period
+      let weeks = 12;
+      let months = 6;
+      
+      if (period === '7') {
+        weeks = 1;
+        months = 1;
+      } else if (period === '30') {
+        weeks = 4;
+        months = 1;
+      } else if (period === '90') {
+        weeks = 12;
+        months = 3;
+      } else if (period === '180') {
+        weeks = 24;
+        months = 6;
+      } else if (period === '365') {
+        weeks = 52;
+        months = 12;
+      }
+      
+      const params = {};
+      if (activityType !== 'all') {
+        params.type = activityType;
+      }
+      
       const [dist, weekly, monthly, intensity] = await Promise.all([
-        analyticsAPI.getDistribution(),
-        analyticsAPI.getWeeklyStats({ weeks: 12 }),
-        analyticsAPI.getMonthlyTrends({ months: 6 }),
-        analyticsAPI.getIntensityDistribution()
+        analyticsAPI.getDistribution(params),
+        analyticsAPI.getWeeklyStats({ ...params, weeks }),
+        analyticsAPI.getMonthlyTrends({ ...params, months }),
+        analyticsAPI.getIntensityDistribution(params)
       ]);
 
       setDistribution(dist.data.distribution.map(d => ({
@@ -74,6 +103,8 @@ function AnalyticsPage() {
     <Layout>
       <div className="analytics-page">
         <h1>Analiza treningów</h1>
+
+        <GlobalFilters showMetric={false} />
 
         <div className="chart-section">
           <h2>Rozkład typów aktywności</h2>

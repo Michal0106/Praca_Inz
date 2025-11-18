@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { RefreshCw, LogOut } from 'lucide-react';
 import Layout from '../components/Layout';
+import GlobalFilters from '../components/GlobalFilters';
+import { useFilters } from '../context/FilterContext';
 import { authAPI, activitiesAPI } from '../services/api';
 import './DashboardPage.css';
 
@@ -12,6 +14,7 @@ function DashboardPage() {
   const [syncing, setSyncing] = useState(false);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { activityType, dateRange } = useFilters();
 
   useEffect(() => {
     fetchUserData();
@@ -20,19 +23,47 @@ function DashboardPage() {
     }
   }, []);
 
+  useEffect(() => {
+    if (!loading) {
+      fetchActivities();
+    }
+  }, [activityType, dateRange]);
+
   const fetchUserData = async () => {
     try {
       const { data } = await authAPI.getCurrentUser();
       setUser(data.user);
       
-      const activitiesData = await activitiesAPI.getActivities({ limit: 10 });
-      setActivities(activitiesData.data.activities);
+      await fetchActivities();
     } catch (error) {
       if (error.response?.status === 401) {
         navigate('/');
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchActivities = async () => {
+    try {
+      const params = { limit: 50 };
+      
+      if (activityType !== 'all') {
+        params.type = activityType;
+      }
+      
+      if (dateRange.start) {
+        params.startDate = dateRange.start.toISOString();
+      }
+      
+      if (dateRange.end) {
+        params.endDate = dateRange.end.toISOString();
+      }
+      
+      const activitiesData = await activitiesAPI.getActivities(params);
+      setActivities(activitiesData.data.activities);
+    } catch (error) {
+      console.error('Fetch activities error:', error);
     }
   };
 
@@ -89,6 +120,8 @@ function DashboardPage() {
             </button>
           </div>
         </div>
+
+        <GlobalFilters showMetric={false} />
 
         <div className="stats-grid">
           <div className="stat-card">
