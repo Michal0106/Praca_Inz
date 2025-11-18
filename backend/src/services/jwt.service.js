@@ -1,122 +1,121 @@
-import jwt from 'jsonwebtoken';
-import crypto from 'crypto';
-import prisma from '../config/database.js';
+import jwt from "jsonwebtoken";
+import crypto from "crypto";
+import prisma from "../config/database.js";
 
 class JwtService {
- 
- generateAccessToken(userId) {
- return jwt.sign(
- { userId, type: 'access' },
- process.env.JWT_SECRET,
- { expiresIn: process.env.JWT_EXPIRES_IN || '1h' }
- );
- }
+  generateAccessToken(userId) {
+    return jwt.sign({ userId, type: "access" }, process.env.JWT_SECRET, {
+      expiresIn: process.env.JWT_EXPIRES_IN || "1h",
+    });
+  }
 
- async generateRefreshToken(userId) {
- const token = jwt.sign(
- { userId, type: 'refresh' },
- process.env.JWT_REFRESH_SECRET,
- { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d' }
- );
+  async generateRefreshToken(userId) {
+    const token = jwt.sign(
+      { userId, type: "refresh" },
+      process.env.JWT_REFRESH_SECRET,
+      { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || "7d" },
+    );
 
- const expiresIn = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
- const expiresAt = new Date();
- 
- const match = expiresIn.match(/^(\d+)([dhms])$/);
- if (match) {
- const value = parseInt(match[1]);
- const unit = match[2];
- 
- switch (unit) {
- case 'd': expiresAt.setDate(expiresAt.getDate() + value); break;
- case 'h': expiresAt.setHours(expiresAt.getHours() + value); break;
- case 'm': expiresAt.setMinutes(expiresAt.getMinutes() + value); break;
- case 's': expiresAt.setSeconds(expiresAt.getSeconds() + value); break;
- }
- }
+    const expiresIn = process.env.JWT_REFRESH_EXPIRES_IN || "7d";
+    const expiresAt = new Date();
 
- await prisma.refreshToken.create({
- data: {
- token,
- userId,
- expiresAt,
- },
- });
+    const match = expiresIn.match(/^(\d+)([dhms])$/);
+    if (match) {
+      const value = parseInt(match[1]);
+      const unit = match[2];
 
- return token;
- }
+      switch (unit) {
+        case "d":
+          expiresAt.setDate(expiresAt.getDate() + value);
+          break;
+        case "h":
+          expiresAt.setHours(expiresAt.getHours() + value);
+          break;
+        case "m":
+          expiresAt.setMinutes(expiresAt.getMinutes() + value);
+          break;
+        case "s":
+          expiresAt.setSeconds(expiresAt.getSeconds() + value);
+          break;
+      }
+    }
 
- verifyAccessToken(token) {
- try {
- const decoded = jwt.verify(token, process.env.JWT_SECRET);
- if (decoded.type !== 'access') {
- throw new Error('Invalid token type');
- }
- return decoded;
- } catch (error) {
- throw new Error('Invalid or expired access token');
- }
- }
+    await prisma.refreshToken.create({
+      data: {
+        token,
+        userId,
+        expiresAt,
+      },
+    });
 
- async verifyRefreshToken(token) {
- try {
- const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
- if (decoded.type !== 'refresh') {
- throw new Error('Invalid token type');
- }
+    return token;
+  }
 
- const storedToken = await prisma.refreshToken.findUnique({
- where: { token },
- });
+  verifyAccessToken(token) {
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      if (decoded.type !== "access") {
+        throw new Error("Invalid token type");
+      }
+      return decoded;
+    } catch (error) {
+      throw new Error("Invalid or expired access token");
+    }
+  }
 
- if (!storedToken) {
- throw new Error('Refresh token not found');
- }
+  async verifyRefreshToken(token) {
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
+      if (decoded.type !== "refresh") {
+        throw new Error("Invalid token type");
+      }
 
- if (storedToken.expiresAt < new Date()) {
- await prisma.refreshToken.delete({ where: { token } });
- throw new Error('Refresh token expired');
- }
+      const storedToken = await prisma.refreshToken.findUnique({
+        where: { token },
+      });
 
- return decoded;
- } catch (error) {
- throw new Error('Invalid or expired refresh token');
- }
- }
+      if (!storedToken) {
+        throw new Error("Refresh token not found");
+      }
 
- async revokeRefreshToken(token) {
- try {
- await prisma.refreshToken.delete({ where: { token } });
- } catch (error) {
- 
- }
- }
+      if (storedToken.expiresAt < new Date()) {
+        await prisma.refreshToken.delete({ where: { token } });
+        throw new Error("Refresh token expired");
+      }
 
- async revokeAllUserTokens(userId) {
- await prisma.refreshToken.deleteMany({
- where: { userId },
- });
- }
+      return decoded;
+    } catch (error) {
+      throw new Error("Invalid or expired refresh token");
+    }
+  }
 
- generateEmailVerificationToken() {
- return crypto.randomBytes(32).toString('hex');
- }
+  async revokeRefreshToken(token) {
+    try {
+      await prisma.refreshToken.delete({ where: { token } });
+    } catch (error) {}
+  }
 
- generatePasswordResetToken() {
- return crypto.randomBytes(32).toString('hex');
- }
+  async revokeAllUserTokens(userId) {
+    await prisma.refreshToken.deleteMany({
+      where: { userId },
+    });
+  }
 
- async cleanupExpiredTokens() {
- const deleted = await prisma.refreshToken.deleteMany({
- where: {
- expiresAt: {
- lt: new Date(),
- },
- },
- });
- console.log(`Cleaned up ${deleted.count} expired refresh tokens`);
- return deleted.count;
- }
+  generatePasswordResetToken() {
+    return crypto.randomBytes(32).toString("hex");
+  }
+
+  async cleanupExpiredTokens() {
+    const deleted = await prisma.refreshToken.deleteMany({
+      where: {
+        expiresAt: {
+          lt: new Date(),
+        },
+      },
+    });
+    console.log(`Cleaned up ${deleted.count} expired refresh tokens`);
+    return deleted.count;
+  }
 }
 
 export const jwtService = new JwtService();

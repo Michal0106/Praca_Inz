@@ -1,12 +1,12 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Award, TrendingUp, Activity as ActivityIcon } from 'lucide-react';
-import Layout from '../components/Layout';
-import GlobalFilters from '../components/GlobalFilters';
-import ActivityModal from '../components/ActivityModal';
-import { useFilters } from '../context/FilterContext';
-import { dataAPI, activitiesAPI } from '../services/api';
-import './DataPage.css';
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { Award, TrendingUp, Activity as ActivityIcon } from "lucide-react";
+import Layout from "../components/Layout";
+import GlobalFilters from "../components/GlobalFilters";
+import ActivityModal from "../components/ActivityModal";
+import { useFilters } from "../context/FilterContext";
+import { dataAPI, activitiesAPI } from "../services/api";
+import "./DataPage.css";
 
 function DataPage() {
   const [stats, setStats] = useState(null);
@@ -16,7 +16,7 @@ function DataPage() {
   const [loading, setLoading] = useState(true);
   const [selectedActivity, setSelectedActivity] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  
+
   const navigate = useNavigate();
   const { activityType, dateRange, metric } = useFilters();
 
@@ -34,14 +34,13 @@ function DataPage() {
     try {
       const [statsRes, activitiesRes] = await Promise.all([
         dataAPI.getUserStats(),
-        activitiesAPI.getActivities({ limit: 50 })
+        activitiesAPI.getActivities({ limit: 50 }),
       ]);
 
       setStats(statsRes.data.stats);
-      
-      // Filtrowane aktywności
+
       const params = { limit: 50 };
-      if (activityType !== 'all') {
+      if (activityType !== "all") {
         params.type = activityType;
       }
       if (dateRange.start) {
@@ -50,16 +49,16 @@ function DataPage() {
       if (dateRange.end) {
         params.endDate = dateRange.end.toISOString();
       }
-      
+
       const filteredActivities = await activitiesAPI.getActivities(params);
       setActivities(filteredActivities.data.activities || []);
-      
+
       await fetchFilteredData();
     } catch (error) {
       if (error.response?.status === 401) {
-        navigate('/');
+        navigate("/");
       }
-      console.error('Fetch data error:', error);
+      console.error("Fetch data error:", error);
     } finally {
       setLoading(false);
     }
@@ -69,13 +68,13 @@ function DataPage() {
     try {
       const [longestRes, hardestRes] = await Promise.all([
         dataAPI.getLongestActivity(metric),
-        dataAPI.getHardestActivity()
+        dataAPI.getHardestActivity(),
       ]);
 
       setLongestActivity(longestRes.data.activity);
       setHardestActivity(hardestRes.data.activity);
     } catch (error) {
-      console.error('Fetch filtered data error:', error);
+      console.error("Fetch filtered data error:", error);
     }
   };
 
@@ -85,7 +84,7 @@ function DataPage() {
       setSelectedActivity(res.data.activity);
       setShowModal(true);
     } catch (error) {
-      console.error('Fetch activity details error:', error);
+      console.error("Fetch activity details error:", error);
     }
   };
 
@@ -113,25 +112,35 @@ function DataPage() {
         <GlobalFilters />
 
         <div className="highlights-section">
-          <div className="highlight-card clickable" onClick={() => longestActivity && handleActivityClick(longestActivity.id)}>
+          <div
+            className="highlight-card clickable"
+            onClick={() =>
+              longestActivity && handleActivityClick(longestActivity.id)
+            }
+          >
             <div className="highlight-icon">
               <Award size={40} />
             </div>
             <h3>
-              {metric === 'distance' && 'Najdłuższy dystans'}
-              {metric === 'duration' && 'Najdłuższy czas'}
-              {metric === 'elevationGain' && 'Największe przewyższenie'}
+              {metric === "distance" && "Najdłuższy dystans"}
+              {metric === "duration" && "Najdłuższy czas"}
+              {metric === "elevationGain" && "Największe przewyższenie"}
             </h3>
             {longestActivity ? (
               <>
                 <p className="highlight-value">
-                  {metric === 'distance' && `${(longestActivity.distance / 1000).toFixed(2)} km`}
-                  {metric === 'duration' && formatDuration(longestActivity.duration)}
-                  {metric === 'elevationGain' && `${longestActivity.elevationGain} m`}
+                  {metric === "distance" &&
+                    `${(longestActivity.distance / 1000).toFixed(2)} km`}
+                  {metric === "duration" &&
+                    formatDuration(longestActivity.duration)}
+                  {metric === "elevationGain" &&
+                    `${longestActivity.elevationGain} m`}
                 </p>
                 <p className="highlight-detail">{longestActivity.name}</p>
                 <p className="highlight-date">
-                  {new Date(longestActivity.startDate).toLocaleDateString('pl-PL')}
+                  {new Date(longestActivity.startDate).toLocaleDateString(
+                    "pl-PL",
+                  )}
                 </p>
               </>
             ) : (
@@ -139,7 +148,12 @@ function DataPage() {
             )}
           </div>
 
-          <div className="highlight-card clickable" onClick={() => hardestActivity && handleActivityClick(hardestActivity.id)}>
+          <div
+            className="highlight-card clickable"
+            onClick={() =>
+              hardestActivity && handleActivityClick(hardestActivity.id)
+            }
+          >
             <div className="highlight-icon">
               <ActivityIcon size={40} />
             </div>
@@ -151,7 +165,9 @@ function DataPage() {
                 </p>
                 <p className="highlight-detail">{hardestActivity.name}</p>
                 <p className="highlight-date">
-                  {new Date(hardestActivity.startDate).toLocaleDateString('pl-PL')}
+                  {new Date(hardestActivity.startDate).toLocaleDateString(
+                    "pl-PL",
+                  )}
                 </p>
               </>
             ) : (
@@ -181,23 +197,27 @@ function DataPage() {
         <div className="activities-list-section">
           <h2>Ostatnie aktywności</h2>
           <div className="activities-table">
-            {activities.slice(0, 20).map(activity => (
-              <div 
-                key={activity.id} 
+            {activities.slice(0, 20).map((activity) => (
+              <div
+                key={activity.id}
                 className="activity-row"
                 onClick={() => handleActivityClick(activity.id)}
               >
                 <div className="activity-info">
                   <span className="activity-type">{activity.type}</span>
-                  <span className="activity-name">{activity.name || 'Trening'}</span>
+                  <span className="activity-name">
+                    {activity.name || "Trening"}
+                  </span>
                   <span className="activity-date">
-                    {new Date(activity.startDate).toLocaleDateString('pl-PL')}
+                    {new Date(activity.startDate).toLocaleDateString("pl-PL")}
                   </span>
                 </div>
                 <div className="activity-stats">
                   <span>{(activity.distance / 1000).toFixed(2)} km</span>
                   <span>{formatDuration(activity.duration)}</span>
-                  {activity.averageHeartRate && <span>{activity.averageHeartRate} bpm</span>}
+                  {activity.averageHeartRate && (
+                    <span>{activity.averageHeartRate} bpm</span>
+                  )}
                 </div>
               </div>
             ))}
@@ -205,12 +225,12 @@ function DataPage() {
         </div>
 
         {showModal && (
-          <ActivityModal 
-            activity={selectedActivity} 
+          <ActivityModal
+            activity={selectedActivity}
             onClose={() => {
               setShowModal(false);
               setSelectedActivity(null);
-            }} 
+            }}
           />
         )}
       </div>

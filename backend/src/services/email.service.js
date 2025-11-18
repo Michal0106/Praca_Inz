@@ -1,92 +1,26 @@
-import nodemailer from 'nodemailer';
+import nodemailer from "nodemailer";
 
 class EmailService {
- constructor() {
- this.transporter = nodemailer.createTransport({
- host: process.env.EMAIL_HOST,
- port: parseInt(process.env.EMAIL_PORT),
- secure: process.env.EMAIL_SECURE === 'true',
- auth: {
- user: process.env.EMAIL_USER,
- pass: process.env.EMAIL_PASSWORD,
- },
- });
- }
+  constructor() {
+    this.transporter = nodemailer.createTransport({
+      host: process.env.EMAIL_HOST,
+      port: parseInt(process.env.EMAIL_PORT),
+      secure: process.env.EMAIL_SECURE === "true",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASSWORD,
+      },
+    });
+  }
 
- async sendVerificationEmail(email, token) {
- const verificationUrl = `${process.env.CLIENT_URL}/verify-email?token=${token}`;
- 
- const mailOptions = {
- from: process.env.EMAIL_FROM,
- to: email,
- subject: 'Potwierdź swój adres email - Training App',
- html: `
- <!DOCTYPE html>
- <html>
- <head>
- <meta charset="utf-8">
- <style>
- body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
- .container { max-width: 600px; margin: 0 auto; padding: 20px; }
- .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
- .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
- .button { display: inline-block; padding: 12px 30px; background: #667eea; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
- .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
- </style>
- </head>
- <body>
- <div class="container">
- <div class="header">
- <h1> Training App</h1>
- <p>Witamy w aplikacji do analizy treningów!</p>
- </div>
- <div class="content">
- <h2>Potwierdź swój adres email</h2>
- <p>Dziękujemy za rejestrację! Aby aktywować swoje konto, kliknij w poniższy przycisk:</p>
- <div style="text-align: center;">
- <a href="${verificationUrl}" class="button">Potwierdź email</a>
- </div>
- <p>Lub skopiuj i wklej poniższy link do przeglądarki:</p>
- <p style="word-break: break-all; color: #667eea;">${verificationUrl}</p>
- <p><strong>Link jest ważny przez 24 godziny.</strong></p>
- <p>Jeśli to nie Ty się rejestrowałeś, zignoruj tę wiadomość.</p>
- </div>
- <div class="footer">
- <p>&copy; 2024 Training App. Wszystkie prawa zastrzeżone.</p>
- </div>
- </div>
- </body>
- </html>
- `,
- text: `
- Witaj w Training App!
- 
- Dziękujemy za rejestrację. Aby aktywować swoje konto, kliknij w poniższy link:
- ${verificationUrl}
- 
- Link jest ważny przez 24 godziny.
- 
- Jeśli to nie Ty się rejestrowałeś, zignoruj tę wiadomość.
- `,
- };
+  async sendPasswordResetEmail(email, token) {
+    const resetUrl = `${process.env.CLIENT_URL}/reset-password?token=${token}`;
 
- try {
- await this.transporter.sendMail(mailOptions);
- console.log(`Verification email sent to ${email}`);
- } catch (error) {
- console.error('Error sending verification email:', error);
- throw new Error('Failed to send verification email');
- }
- }
-
- async sendPasswordResetEmail(email, token) {
- const resetUrl = `${process.env.CLIENT_URL}/reset-password?token=${token}`;
- 
- const mailOptions = {
- from: process.env.EMAIL_FROM,
- to: email,
- subject: 'Reset hasła - Training App',
- html: `
+    const mailOptions = {
+      from: process.env.EMAIL_FROM,
+      to: email,
+      subject: "Reset hasła - Training App",
+      html: `
  <!DOCTYPE html>
  <html>
  <head>
@@ -123,7 +57,7 @@ class EmailService {
  </body>
  </html>
  `,
- text: `
+      text: `
  Reset hasła - Training App
  
  Otrzymaliśmy prośbę o reset hasła do Twojego konta.
@@ -134,23 +68,23 @@ class EmailService {
  
  Jeśli to nie Ty prosiłeś o reset hasła, zignoruj tę wiadomość.
  `,
- };
+    };
 
- try {
- await this.transporter.sendMail(mailOptions);
- console.log(`Password reset email sent to ${email}`);
- } catch (error) {
- console.error('Error sending password reset email:', error);
- throw new Error('Failed to send password reset email');
- }
- }
+    try {
+      await this.transporter.sendMail(mailOptions);
+      console.log(`Password reset email sent to ${email}`);
+    } catch (error) {
+      console.error("Error sending password reset email:", error);
+      throw new Error("Failed to send password reset email");
+    }
+  }
 
- async sendWelcomeEmail(email, firstName) {
- const mailOptions = {
- from: process.env.EMAIL_FROM,
- to: email,
- subject: 'Witaj w Training App! ',
- html: `
+  async sendWelcomeEmail(email, firstName) {
+    const mailOptions = {
+      from: process.env.EMAIL_FROM,
+      to: email,
+      subject: "Witaj w Training App! ",
+      html: `
  <!DOCTYPE html>
  <html>
  <head>
@@ -169,7 +103,7 @@ class EmailService {
  <div class="container">
  <div class="header">
  <h1> Training App</h1>
- <p>Witaj ${firstName || 'w naszej społeczności'}!</p>
+ <p>Witaj ${firstName || "w naszej społeczności"}!</p>
  </div>
  <div class="content">
  <h2>Twoje konto jest aktywne! </h2>
@@ -204,16 +138,15 @@ class EmailService {
  </body>
  </html>
  `,
- };
+    };
 
- try {
- await this.transporter.sendMail(mailOptions);
- console.log(`Welcome email sent to ${email}`);
- } catch (error) {
- console.error('Error sending welcome email:', error);
- 
- }
- }
+    try {
+      await this.transporter.sendMail(mailOptions);
+      console.log(`Welcome email sent to ${email}`);
+    } catch (error) {
+      console.error("Error sending welcome email:", error);
+    }
+  }
 }
 
 export const emailService = new EmailService();

@@ -1,19 +1,19 @@
-import express from 'express';
-import { isAuthenticated } from '../middleware/auth.middleware.js';
-import { 
-  getUserStats, 
+import express from "express";
+import { authenticate } from "../middleware/auth.middleware.js";
+import {
+  getUserStats,
   getLongestActivity,
   getHardestActivity,
   getActivityRecords,
-  getAverageMetrics
-} from '../controllers/data.controller.js';
+  getAverageMetrics,
+} from "../controllers/data.controller.js";
 
 const router = express.Router();
 
-router.get('/stats', isAuthenticated, getUserStats);
-router.get('/longest-activity', isAuthenticated, getLongestActivity);
-router.get('/hardest-activity', isAuthenticated, getHardestActivity);
-router.get('/records', isAuthenticated, getActivityRecords);
-router.get('/averages', isAuthenticated, getAverageMetrics);
+router.get("/stats", authenticate, getUserStats);
+router.get("/longest-activity", authenticate, getLongestActivity);
+router.get("/hardest-activity", authenticate, getHardestActivity);
+router.get("/records", authenticate, getActivityRecords);
+router.get("/averages", authenticate, getAverageMetrics);
 
 export default router;

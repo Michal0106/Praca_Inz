@@ -1,16 +1,17 @@
-import { useNavigate, useLocation } from 'react-router-dom';
-import { Home, BarChart3, Database, Calendar } from 'lucide-react';
-import './Layout.css';
+import { useNavigate, useLocation } from "react-router-dom";
+import { Home, BarChart3, Database, Calendar, User } from "lucide-react";
+import "./Layout.css";
 
 function Layout({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
 
   const navItems = [
-    { path: '/dashboard', icon: Home, label: 'Panel' },
-    { path: '/analytics', icon: BarChart3, label: 'Analizuj' },
-    { path: '/data', icon: Database, label: 'Dane' },
-    { path: '/training-plan', icon: Calendar, label: 'Plan treningowy' }
+    { path: "/dashboard", icon: Home, label: "Panel" },
+    { path: "/analytics", icon: BarChart3, label: "Analizuj" },
+    { path: "/data", icon: Database, label: "Dane" },
+    { path: "/training-plan", icon: Calendar, label: "Plan treningowy" },
+    { path: "/account", icon: User, label: "Moje konto" },
   ];
 
   return (
@@ -26,7 +27,7 @@ function Layout({ children }) {
             return (
               <button
                 key={item.path}
-                className={`nav-item ${isActive ? 'active' : ''}`}
+                className={`nav-item ${isActive ? "active" : ""}`}
                 onClick={() => navigate(item.path)}
               >
                 <Icon size={22} />
@@ -36,9 +37,7 @@ function Layout({ children }) {
           })}
         </div>
       </nav>
-      <main className="main-content">
-        {children}
-      </main>
+      <main className="main-content">{children}</main>
     </div>
   );
 }

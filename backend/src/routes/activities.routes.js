@@ -1,12 +1,19 @@
-import express from 'express';
-import { isAuthenticated } from '../middleware/auth.middleware.js';
-import { getActivities, syncActivities, getActivityById, getActivityTypes } from '../controllers/activities.controller.js';
+import express from "express";
+import { authenticate } from "../middleware/auth.middleware.js";
+import {
+  getActivities,
+  syncActivities,
+  getActivityById,
+  getActivityTypes,
+  recalculatePaceData,
+} from "../controllers/activities.controller.js";
 
 const router = express.Router();
 
-router.get('/', isAuthenticated, getActivities);
-router.get('/types', isAuthenticated, getActivityTypes);
-router.get('/:id', isAuthenticated, getActivityById);
-router.post('/sync', isAuthenticated, syncActivities);
+router.get("/", authenticate, getActivities);
+router.get("/types", authenticate, getActivityTypes);
+router.get("/:id", authenticate, getActivityById);
+router.post("/sync", authenticate, syncActivities);
+router.post("/recalculate-pace", authenticate, recalculatePaceData);
 
 export default router;

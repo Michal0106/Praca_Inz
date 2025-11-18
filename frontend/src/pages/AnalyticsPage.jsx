@@ -1,13 +1,34 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import Layout from '../components/Layout';
-import GlobalFilters from '../components/GlobalFilters';
-import { useFilters } from '../context/FilterContext';
-import { analyticsAPI } from '../services/api';
-import './AnalyticsPage.css';
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
+import Layout from "../components/Layout";
+import GlobalFilters from "../components/GlobalFilters";
+import { useFilters } from "../context/FilterContext";
+import { analyticsAPI } from "../services/api";
+import "./AnalyticsPage.css";
 
-const COLORS = ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#43e97b', '#fa709a'];
+const COLORS = [
+  "#667eea",
+  "#764ba2",
+  "#f093fb",
+  "#4facfe",
+  "#43e97b",
+  "#fa709a",
+];
 
 function AnalyticsPage() {
   const [distribution, setDistribution] = useState([]);
@@ -24,68 +45,87 @@ function AnalyticsPage() {
 
   const fetchAnalytics = async () => {
     try {
-      // Oblicz weeks i months na podstawie period
       let weeks = 12;
       let months = 6;
-      
-      if (period === '7') {
+
+      if (period === "7") {
         weeks = 1;
         months = 1;
-      } else if (period === '30') {
+      } else if (period === "30") {
         weeks = 4;
         months = 1;
-      } else if (period === '90') {
+      } else if (period === "90") {
         weeks = 12;
         months = 3;
-      } else if (period === '180') {
+      } else if (period === "180") {
         weeks = 24;
         months = 6;
-      } else if (period === '365') {
+      } else if (period === "365") {
         weeks = 52;
         months = 12;
       }
-      
+
       const params = {};
-      if (activityType !== 'all') {
+      if (activityType !== "all") {
         params.type = activityType;
       }
-      
+
       const [dist, weekly, monthly, intensity] = await Promise.all([
         analyticsAPI.getDistribution(params),
         analyticsAPI.getWeeklyStats({ ...params, weeks }),
         analyticsAPI.getMonthlyTrends({ ...params, months }),
-        analyticsAPI.getIntensityDistribution(params)
+        analyticsAPI.getIntensityDistribution(params),
       ]);
 
-      setDistribution(dist.data.distribution.map(d => ({
-        name: d.type,
-        value: Number(d.count),
-        distance: Number(d.total_distance) / 1000
-      })));
+      setDistribution(
+        dist.data.distribution.map((d) => ({
+          name: d.type,
+          value: Number(d.count),
+          distance: Number(d.total_distance) / 1000,
+        })),
+      );
 
-      setWeeklyStats(weekly.data.weeklyStats.map(w => ({
-        week: new Date(w.week).toLocaleDateString('pl-PL', { month: 'short', day: 'numeric' }),
-        activities: Number(w.activities_count),
-        distance: Number(w.total_distance) / 1000,
-        duration: Number(w.total_duration) / 3600
-      })).reverse());
+      setWeeklyStats(
+        weekly.data.weeklyStats
+          .map((w) => ({
+            week: new Date(w.week).toLocaleDateString("pl-PL", {
+              month: "short",
+              day: "numeric",
+            }),
+            activities: Number(w.activities_count),
+            distance: Number(w.total_distance) / 1000,
+            duration: Number(w.total_duration) / 3600,
+          }))
+          .reverse(),
+      );
 
-      setMonthlyTrends(monthly.data.monthlyTrends.map(m => ({
-        month: new Date(m.month).toLocaleDateString('pl-PL', { month: 'long' }),
-        activities: Number(m.activities_count),
-        distance: Number(m.total_distance) / 1000,
-        avgDistance: Number(m.avg_distance) / 1000
-      })));
+      setMonthlyTrends(
+        monthly.data.monthlyTrends.map((m) => ({
+          month: new Date(m.month).toLocaleDateString("pl-PL", {
+            month: "long",
+          }),
+          activities: Number(m.activities_count),
+          distance: Number(m.total_distance) / 1000,
+          avgDistance: Number(m.avg_distance) / 1000,
+        })),
+      );
 
-      setIntensityData(intensity.data.intensityDistribution.map(i => ({
-        name: i.intensity === 'LOW' ? 'Niska' : i.intensity === 'MEDIUM' ? 'Średnia' : 'Wysoka',
-        value: Number(i.count)
-      })));
+      setIntensityData(
+        intensity.data.intensityDistribution.map((i) => ({
+          name:
+            i.intensity === "LOW"
+              ? "Niska"
+              : i.intensity === "MEDIUM"
+                ? "Średnia"
+                : "Wysoka",
+          value: Number(i.count),
+        })),
+      );
     } catch (error) {
       if (error.response?.status === 401) {
-        navigate('/');
+        navigate("/");
       }
-      console.error('Fetch analytics error:', error);
+      console.error("Fetch analytics error:", error);
     } finally {
       setLoading(false);
     }
@@ -115,13 +155,18 @@ function AnalyticsPage() {
                 cx="50%"
                 cy="50%"
                 labelLine={false}
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                label={({ name, percent }) =>
+                  `${name} ${(percent * 100).toFixed(0)}%`
+                }
                 outerRadius={100}
                 fill="#8884d8"
                 dataKey="value"
               >
                 {distribution.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  <Cell
+                    key={`cell-${index}`}
+                    fill={COLORS[index % COLORS.length]}
+                  />
                 ))}
               </Pie>
               <Tooltip />
@@ -139,8 +184,18 @@ function AnalyticsPage() {
               <YAxis yAxisId="right" orientation="right" />
               <Tooltip />
               <Legend />
-              <Bar yAxisId="left" dataKey="activities" fill="#667eea" name="Liczba treningów" />
-              <Bar yAxisId="right" dataKey="distance" fill="#764ba2" name="Dystans (km)" />
+              <Bar
+                yAxisId="left"
+                dataKey="activities"
+                fill="#667eea"
+                name="Liczba treningów"
+              />
+              <Bar
+                yAxisId="right"
+                dataKey="distance"
+                fill="#764ba2"
+                name="Dystans (km)"
+              />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -154,8 +209,20 @@ function AnalyticsPage() {
               <YAxis />
               <Tooltip />
               <Legend />
-              <Line type="monotone" dataKey="distance" stroke="#667eea" name="Całkowity dystans (km)" strokeWidth={2} />
-              <Line type="monotone" dataKey="avgDistance" stroke="#f093fb" name="Średni dystans (km)" strokeWidth={2} />
+              <Line
+                type="monotone"
+                dataKey="distance"
+                stroke="#667eea"
+                name="Całkowity dystans (km)"
+                strokeWidth={2}
+              />
+              <Line
+                type="monotone"
+                dataKey="avgDistance"
+                stroke="#f093fb"
+                name="Średni dystans (km)"
+                strokeWidth={2}
+              />
             </LineChart>
           </ResponsiveContainer>
         </div>

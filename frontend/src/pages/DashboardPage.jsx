@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { RefreshCw, LogOut } from 'lucide-react';
-import Layout from '../components/Layout';
-import GlobalFilters from '../components/GlobalFilters';
-import { useFilters } from '../context/FilterContext';
-import { authAPI, activitiesAPI } from '../services/api';
-import './DashboardPage.css';
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { RefreshCw, LogOut } from "lucide-react";
+import Layout from "../components/Layout";
+import GlobalFilters from "../components/GlobalFilters";
+import { useFilters } from "../context/FilterContext";
+import { authAPI, activitiesAPI } from "../services/api";
+import "./DashboardPage.css";
 
 function DashboardPage() {
   const [user, setUser] = useState(null);
@@ -13,14 +13,10 @@ function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const { activityType, dateRange } = useFilters();
 
   useEffect(() => {
     fetchUserData();
-    if (searchParams.get('auth') === 'success') {
-      handleSync();
-    }
   }, []);
 
   useEffect(() => {
@@ -33,11 +29,11 @@ function DashboardPage() {
     try {
       const { data } = await authAPI.getCurrentUser();
       setUser(data.user);
-      
+
       await fetchActivities();
     } catch (error) {
       if (error.response?.status === 401) {
-        navigate('/');
+        navigate("/");
       }
     } finally {
       setLoading(false);
@@ -47,34 +43,59 @@ function DashboardPage() {
   const fetchActivities = async () => {
     try {
       const params = { limit: 50 };
-      
-      if (activityType !== 'all') {
+
+      if (activityType !== "all") {
         params.type = activityType;
       }
-      
+
       if (dateRange.start) {
         params.startDate = dateRange.start.toISOString();
       }
-      
+
       if (dateRange.end) {
         params.endDate = dateRange.end.toISOString();
       }
-      
+
       const activitiesData = await activitiesAPI.getActivities(params);
       setActivities(activitiesData.data.activities);
     } catch (error) {
-      console.error('Fetch activities error:', error);
+      console.error("Fetch activities error:", error);
     }
   };
 
   const handleSync = async () => {
+    if (!user?.hasStravaData) {
+      const confirmLink = confirm(
+        "Aby synchronizować dane ze Stravą, musisz najpierw połączyć swoje konto.\n\n" +
+          "Czy chcesz przejść do ustawień konta?",
+      );
+      if (confirmLink) {
+        navigate("/account");
+      }
+      return;
+    }
+
     setSyncing(true);
     try {
       await activitiesAPI.syncActivities();
       await fetchUserData();
-      alert('Dane zsynchronizowane pomyślnie!');
+      alert("Dane zsynchronizowane pomyślnie!");
     } catch (error) {
-      alert('Błąd podczas synchronizacji danych');
+      console.error("Sync error:", error);
+      if (error.response?.data?.requiresStravaLink) {
+        const confirmLink = confirm(
+          "Twoje konto Strava wymaga ponownej autoryzacji.\n\n" +
+            "Czy chcesz przejść do ustawień konta?",
+        );
+        if (confirmLink) {
+          navigate("/account");
+        }
+      } else {
+        alert(
+          "Błąd podczas synchronizacji danych: " +
+            (error.response?.data?.error || error.message),
+        );
+      }
     } finally {
       setSyncing(false);
     }
@@ -83,9 +104,9 @@ function DashboardPage() {
   const handleLogout = async () => {
     try {
       await authAPI.logout();
-      navigate('/');
+      navigate("/");
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error("Logout error:", error);
     }
   };
 
@@ -103,16 +124,29 @@ function DashboardPage() {
         <div className="dashboard-header">
           <div>
             <h1>Panel główny</h1>
-            <p className="user-email">{user?.email}</p>
+            <p className="user-email">
+              {user?.email}
+              {user?.hasStravaData && (
+                <span
+                  style={{
+                    marginLeft: "10px",
+                    color: "#fc5200",
+                    fontSize: "0.9em",
+                  }}
+                >
+                  Połączono ze Stravą
+                </span>
+              )}
+            </p>
           </div>
           <div className="header-actions">
-            <button 
-              className="sync-btn" 
-              onClick={handleSync} 
+            <button
+              className="sync-btn"
+              onClick={handleSync}
               disabled={syncing}
             >
-              <RefreshCw size={20} className={syncing ? 'spinning' : ''} />
-              {syncing ? 'Synchronizacja...' : 'Synchronizuj dane'}
+              <RefreshCw size={20} className={syncing ? "spinning" : ""} />
+              {syncing ? "Synchronizacja..." : "Synchronizuj dane"}
             </button>
             <button className="logout-btn" onClick={handleLogout}>
               <LogOut size={20} />
@@ -151,7 +185,10 @@ function DashboardPage() {
         <div className="recent-activities">
           <h2>Ostatnie aktywności</h2>
           {activities.length === 0 ? (
-            <p className="no-data">Brak aktywności. Kliknij "Synchronizuj dane" aby załadować treningi.</p>
+            <p className="no-data">
+              Brak aktywności. Kliknij "Synchronizuj dane" aby załadować
+              treningi.
+            </p>
           ) : (
             <div className="activities-list">
               {activities.map((activity) => (
@@ -160,7 +197,7 @@ function DashboardPage() {
                     <h4>{activity.name}</h4>
                     <p className="activity-type">{activity.type}</p>
                     <p className="activity-date">
-                      {new Date(activity.startDate).toLocaleDateString('pl-PL')}
+                      {new Date(activity.startDate).toLocaleDateString("pl-PL")}
                     </p>
                   </div>
                   <div className="activity-stats">
