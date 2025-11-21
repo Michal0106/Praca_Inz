@@ -90,7 +90,6 @@ function DataPage() {
 
   const fetchFilteredData = async () => {
     try {
-      // Przygotuj parametry filtrów
       const params = {};
       
       if (activityType !== "all") {
@@ -108,14 +107,17 @@ function DataPage() {
       const [longestRes, hardestRes] = await Promise.all([
         dataAPI.getLongestActivity(metric, params),
         dataAPI.getHardestActivity(params),
+        activitiesAPI.getActivities(params),
       ]);
 
-      setLongestActivity(longestRes.data.activity);
-      setHardestActivity(hardestRes.data.activity);
-    } catch (error) {
-      console.error("Fetch filtered data error:", error);
-    }
-  };
+    setLongestActivity(longestRes.data.activity);
+    setHardestActivity(hardestRes.data.activity);
+    setActivities(activitiesRes.data.activities || []);
+  } catch (error) {
+    console.error("Fetch filtered data error:", error);
+  }
+};
+
 
   const handleActivityClick = async (activityId) => {
     try {
