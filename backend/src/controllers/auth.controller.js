@@ -363,10 +363,10 @@ export const stravaCallback = async (req, res) => {
       user = await prisma.user.create({
         data: {
           email: emailSafe,
+          password: "STRAVA_OAUTH",
           stravaId,
           firstName: athlete.firstname || null,
           lastName: athlete.lastname || null,
-          password: "STRAVA_OAUTH",
           isEmailVerified: true,
           stravaAccessToken: access_token,
           stravaRefreshToken: refresh_token,
@@ -378,15 +378,15 @@ export const stravaCallback = async (req, res) => {
       await prisma.user.update({
         where: { id: user.id },
         data: {
+          firstName: user.firstName || athlete.firstname || null,
+          lastName: user.lastName || athlete.lastname || null,
           stravaAccessToken: access_token,
           stravaRefreshToken: refresh_token,
           stravaTokenExpiresAt: new Date(expires_at * 1000),
-          firstName: athlete.firstname || user.firstName,
-          lastName: athlete.lastname || user.lastName,
         },
       });
-      user = await prisma.user.findUnique({ where: { id: user.id } });
     }
+
 
 
 

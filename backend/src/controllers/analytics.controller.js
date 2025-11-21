@@ -373,7 +373,9 @@ export const compareActivities = async (req, res) => {
             km42: a.paceDistance.km42,
           }
         : null,
+      pacePerKm: Array.isArray(a.pacePerKm) ? a.pacePerKm : null,
     });
+
 
     res.json({
       first: formatActivity(first),
