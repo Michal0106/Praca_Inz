@@ -38,12 +38,11 @@ export const register = async (req, res) => {
         password: hashedPassword,
         firstName,
         lastName,
-        isEmailVerified: true, 
-        userStats: {
-          create: {},
-        },
+        isEmailVerified: false,
+        userStats: { create: {} }
       },
     });
+
 
     try {
       await emailService.sendWelcomeEmail(email, firstName);
@@ -286,22 +285,17 @@ export const getCurrentUser = async (req, res) => {
 
 
 export const stravaAuth = (req, res) => {
-  let userId = req.user?.userId;
+  const mode = req.query.mode === "connect" ? "connect" : "login";
 
-  if (!userId && req.query.token) {
-    try {
-      const decoded = jwtService.verifyAccessToken(req.query.token);
-      userId = decoded.userId;
-    } catch (e) {
-      console.warn("Failed to verify token from query:", e);
-    }
+  let userId = null;
+
+  if (mode === "connect" && req.user?.userId) {
+    userId = req.user.userId;
   }
 
-  const stateData = userId
-    ? JSON.stringify({ userId })
-    : JSON.stringify({ random: Math.random().toString(36).substring(7) });
+  const stateData = JSON.stringify({ mode, userId });
 
-  const stravaAuthUrl =
+  const url =
     "https://www.strava.com/oauth/authorize?" +
     new URLSearchParams({
       client_id: process.env.STRAVA_CLIENT_ID,
@@ -311,90 +305,105 @@ export const stravaAuth = (req, res) => {
       state: stateData,
     });
 
-  res.redirect(stravaAuthUrl);
+  return res.redirect(url);
 };
+
+
+
 
 export const stravaCallback = async (req, res) => {
   try {
     const { code, state } = req.query;
 
-    const tokenData = await stravaService.exchangeToken(code);
-    const athleteData = await stravaService.getAthleteProfile(
-      tokenData.access_token,
-    );
+    const { access_token, refresh_token, expires_at } =
+      await stravaService.exchangeToken(code);
 
-    let userId = req.user?.userId;
+    const athlete = await stravaService.getAthleteProfile(access_token);
 
-    if (state && !userId) {
-      try {
-        const stateData = JSON.parse(state);
-        userId = stateData.userId;
-      } catch (e) {
-        console.warn("Failed to parse state:", e);
-      }
-    }
+    const stateData = JSON.parse(state);
+    const mode = stateData.mode || "login";
 
-    if (userId) {
-      const existingStravaUser = await prisma.user.findUnique({
-        where: { stravaId: athleteData.id.toString() },
-      });
+    // KONWERSJA
+    const stravaId = athlete.id.toString();
+    const emailSafe = athlete.email || `strava_${stravaId}@strava.local`;
 
-      if (existingStravaUser && existingStravaUser.id !== userId) {
+    // ---------------------------
+    // TRYB 1: PODPIĘCIE DO KONTA
+    // ---------------------------
+    if (mode === "connect") {
+      const userId = stateData.userId;
+
+      if (!userId) {
         return res.redirect(
-          `${process.env.CLIENT_URL}/account?error=strava_already_linked`,
+          `${process.env.CLIENT_URL}/account?error=not_logged_in`
         );
       }
 
       await prisma.user.update({
         where: { id: userId },
         data: {
-          stravaId: athleteData.id.toString(),
-          stravaAccessToken: tokenData.access_token,
-          stravaRefreshToken: tokenData.refresh_token,
-          stravaTokenExpiresAt: new Date(tokenData.expires_at * 1000),
+          stravaId,
+          stravaAccessToken: access_token,
+          stravaRefreshToken: refresh_token,
+          stravaTokenExpiresAt: new Date(expires_at * 1000),
         },
       });
-      res.redirect(`${process.env.CLIENT_URL}/account?strava=linked`);
-    } else {
-      let user = await prisma.user.findUnique({
-        where: { stravaId: athleteData.id.toString() },
+
+      return res.redirect(`${process.env.CLIENT_URL}/account?strava=linked`);
+    }
+
+    // ---------------------------
+    // TRYB 2: LOGOWANIE STRAVĄ
+    // ---------------------------
+
+    let user = await prisma.user.findUnique({
+      where: { stravaId },
+    });
+
+    if (!user) {
+      // ✔ Tworzymy nowe konto
+      user = await prisma.user.create({
+        data: {
+          email: emailSafe,
+          stravaId,
+          password: "STRAVA_OAUTH",
+          isEmailVerified: true,
+          stravaAccessToken: access_token,
+          stravaRefreshToken: refresh_token,
+          stravaTokenExpiresAt: new Date(expires_at * 1000),
+          userStats: { create: {} },
+        },
       });
-
-      if (!user) {
-        user = await prisma.user.create({
-          data: {
-            stravaId: athleteData.id.toString(),
-            email: athleteData.email,
-            stravaAccessToken: tokenData.access_token,
-            stravaRefreshToken: tokenData.refresh_token,
-            stravaTokenExpiresAt: new Date(tokenData.expires_at * 1000),
-            isEmailVerified: true, 
-            userStats: {
-              create: {},
-            },
-          },
-        });
-      }
-
-      req.session.userId = user.id;
-      req.session.accessToken = tokenData.access_token;
-      req.session.refreshToken = tokenData.refresh_token;
-      req.session.source = "STRAVA";
-
-      res.redirect(`${process.env.CLIENT_URL}/dashboard?auth=success`);
-    }
-  } catch (error) {
-    console.error("Strava auth error:", error);
-
-    if (error.code === "P2002") {
-      return res.redirect(
-        `${process.env.CLIENT_URL}/account?error=strava_already_linked`,
-      );
+    } else {
+      // ✔ aktualizujemy tokeny
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          stravaAccessToken: access_token,
+          stravaRefreshToken: refresh_token,
+          stravaTokenExpiresAt: new Date(expires_at * 1000),
+        },
+      });
     }
 
-    res.redirect(`${process.env.CLIENT_URL}/account?error=auth_failed`);
+    // generujemy JWT, żeby frontend mógł się zalogować
+    req.session = null;
+
+    const jwtAccess = jwtService.generateAccessToken(user.id);
+    const jwtRefresh = await jwtService.generateRefreshToken(user.id);
+
+    return res.redirect(
+      `${process.env.CLIENT_URL}/dashboard?auth=success&access=${jwtAccess}&refresh=${jwtRefresh}`
+    );
+
+  } catch (err) {
+    console.error("Strava callback error:", err);
+    return res.redirect(`${process.env.CLIENT_URL}/account?error=strava_failed`);
   }
 };
+
+
+
 
 export const unlinkStrava = async (req, res) => {
   try {

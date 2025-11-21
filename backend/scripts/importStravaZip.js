@@ -1,24 +1,26 @@
-import 'dotenv/config';
-import fs from 'fs';
-import path from 'path';
-import AdmZip from 'adm-zip';
-import { XMLParser } from 'fast-xml-parser';
-import prisma from '../src/config/database.js';
+import "dotenv/config";
+import fs from "fs";
+import path from "path";
+import AdmZip from "adm-zip";
+import { XMLParser } from "fast-xml-parser";
+import prisma from "../src/config/database.js";
 
-
-
+/* distance between two points*/
 function haversine([lat1, lon1], [lat2, lon2]) {
   const toRad = (v) => (v * Math.PI) / 180;
-  const R = 6371000; 
+  const R = 6371000;
   const dLat = toRad(lat2 - lat1);
   const dLon = toRad(lon2 - lon1);
   const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) *
+      Math.cos(toRad(lat2)) *
+      Math.sin(dLon / 2) ** 2;
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 }
+
+
 
 function parseTime(t) {
   if (!t) return null;
@@ -26,94 +28,133 @@ function parseTime(t) {
   return isNaN(d.getTime()) ? null : d;
 }
 
-function extractGPX(gpxObj) {
+/* for out chart, still todo */
+function computePacePerKm(points) {
+  if (!points || points.length < 2) return null;
 
+  let distances = [0]; // m
+  for (let i = 1; i < points.length; i++) {
+    const d = haversine(
+      [points[i - 1].lat, points[i - 1].lon],
+      [points[i].lat, points[i].lon]
+    );
+    distances[i] = distances[i - 1] + d;
+  }
+
+  let kmTimes = {}; 
+
+  let currentKm = 1;
+  let lastKmTime = points[0].time;
+
+  for (let i = 1; i < points.length; i++) {
+    if (!points[i].time) continue;
+
+    const totalMeters = distances[i];
+    const targetMeters = currentKm * 1000;
+
+    if (totalMeters >= targetMeters) {
+      const segmentSec =
+        (points[i].time - lastKmTime) / 1000; // seconds
+      const pace = segmentSec / 60;           // min/km
+      kmTimes[`km${currentKm}`] = pace;
+
+      lastKmTime = points[i].time;
+      currentKm++;
+    }
+  }
+
+  // standard race checkpoints
+  const standardDistances = {
+    km1: kmTimes.km1 || null,
+    km5: kmTimes.km5 ? avgPace(kmTimes, 5) : null,
+    km10: kmTimes.km10 ? avgPace(kmTimes, 10) : null,
+    km21: kmTimes.km21 ? avgPace(kmTimes, 21) : null,
+    km42: kmTimes.km42 ? avgPace(kmTimes, 42) : null,
+  };
+
+  return { perKm: kmTimes, checkpoints: standardDistances };
+}
+
+
+
+function avgPace(kmTimes, n) {
+  let valid = [];
+  for (let i = 1; i <= n; i++) {
+    if (kmTimes[`km${i}`]) valid.push(kmTimes[`km${i}`]);
+  }
+  if (valid.length === 0) return null;
+  return valid.reduce((a, b) => a + b) / valid.length;
+}
+
+
+
+
+/* activity .gpx */
+function extractGPX(gpxObj) {
   const trk = gpxObj.gpx?.trk;
   if (!trk) return null;
 
-  const name = trk.name || gpxObj.gpx?.metadata?.name || 'Imported activity';
   const track = Array.isArray(trk) ? trk[0] : trk;
+  const nameRaw = track.name || gpxObj.gpx?.metadata?.name;
+  const name = nameRaw ? String(nameRaw) : "Imported activity";
+
   const segs = track.trkseg;
+  const segments = Array.isArray(segs) ? segs : [segs];
+
   const points = [];
 
-  const segments = Array.isArray(segs) ? segs : [segs];
   for (const seg of segments) {
-    const trkpts = seg.trkpt || [];
+    const trkpts = seg?.trkpt || [];
     const arr = Array.isArray(trkpts) ? trkpts : [trkpts];
     for (const p of arr) {
-      const lat = parseFloat(p['@_lat']);
-      const lon = parseFloat(p['@_lon']);
+      const lat = parseFloat(p["@_lat"]);
+      const lon = parseFloat(p["@_lon"]);
       const time = parseTime(p.time);
       if (!isNaN(lat) && !isNaN(lon)) points.push({ lat, lon, time });
     }
   }
 
-  if (points.length === 0) return null;
+  if (points.length < 2) return null;
 
-  const start = points[0].time || null;
-  const end = points[points.length - 1].time || null;
-  const duration = start && end ? Math.round((end - start) / 1000) : null;
-
-  let distance = 0;
-  for (let i = 1; i < points.length; i++) {
-    distance += haversine([points[i - 1].lat, points[i - 1].lon], [points[i].lat, points[i].lon]);
-  }
-
-  return { name, start, duration, distance: Math.round(distance), points };
-}
-
-function extractTCX(tcxObj) {
-
-
-  const activities = tcxObj.TrainingCenterDatabase?.Activities?.Activity;
-  if (!activities) return null;
-
-  const act = Array.isArray(activities) ? activities[0] : activities;
-  const name = act?._name || act?.Id || 'Imported activity';
-
-  const laps = act.Lap ? (Array.isArray(act.Lap) ? act.Lap : [act.Lap]) : [];
-  const points = [];
-
-  for (const lap of laps) {
-    const tracks = lap.Track ? (Array.isArray(lap.Track) ? lap.Track : [lap.Track]) : [];
-    for (const track of tracks) {
-      const tps = track.Trackpoint ? (Array.isArray(track.Trackpoint) ? track.Trackpoint : [track.Trackpoint]) : [];
-      for (const tp of tps) {
-        const lat = tp.Position ? parseFloat(tp.Position.LatitudeDegrees) : NaN;
-        const lon = tp.Position ? parseFloat(tp.Position.LongitudeDegrees) : NaN;
-        const time = parseTime(tp.Time);
-        if (!isNaN(lat) && !isNaN(lon)) points.push({ lat, lon, time });
-      }
-    }
-  }
-
-  if (points.length === 0) return null;
-
-  const start = points[0].time || null;
-  const end = points[points.length - 1].time || null;
-  const duration = start && end ? Math.round((end - start) / 1000) : null;
+  const start = points[0].time;
+  const end = points.at(-1).time;
+  const duration = Math.round((end - start) / 1000);
 
   let distance = 0;
   for (let i = 1; i < points.length; i++) {
-    distance += haversine([points[i - 1].lat, points[i - 1].lon], [points[i].lat, points[i].lon]);
+    distance += haversine(
+      [points[i - 1].lat, points[i - 1].lon],
+      [points[i].lat, points[i].lon]
+    );
   }
 
-  return { name, start, duration, distance: Math.round(distance), points };
+  return {
+    name,
+    start,
+    duration,
+    distance: Math.round(distance),
+    points,
+  };
 }
 
+/* parse json api strava format */
 function extractJsonActivity(obj) {
-  const name = obj.name || obj.activity_name || 'Imported activity';
-  const start = parseTime(obj.start_date_local || obj.start_date || obj.start_date_local);
-  const duration = obj.moving_time || obj.elapsed_time || null;
-  const distance = obj.distance || null;
-  const points = null; 
-  return { name, start, duration, distance, points };
+  return {
+    name: String(obj.name || obj.activity_name || "Imported activity"),
+    start: parseTime(obj.start_date_local || obj.start_date),
+    duration: obj.moving_time || obj.elapsed_time || null,
+    distance: obj.distance || null,
+    points: null,                   // no gps in strava .zip
+  };
 }
+
+
+
 
 async function main() {
   const args = process.argv.slice(2);
   if (args.length < 2) {
-    console.error('Usage: node importStravaZip.js <path-to-zip> <userId>');
+    console.error("Usage: node importStravaZip.js <path-to-zip> <userId>");
     process.exit(1);
   }
 
@@ -121,139 +162,86 @@ async function main() {
   const userId = args[1];
 
   if (!fs.existsSync(zipPath)) {
-    console.error('Zip file not found:', zipPath);
+    console.error("Zip file not found:", zipPath);
     process.exit(1);
   }
 
   const zip = new AdmZip(zipPath);
   const entries = zip.getEntries();
-
-  const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
+  const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "@_" });
 
   let createdCount = 0;
 
   for (const entry of entries) {
     if (entry.isDirectory) continue;
+
     const ext = path.extname(entry.entryName).toLowerCase();
-    const base = path.basename(entry.entryName);
+    if (![".gpx", ".tcx", ".json"].includes(ext)) continue; // ignore messaging.json
 
     try {
-      if (ext === '.gpx') {
-        const text = entry.getData().toString('utf8');
+      if (ext === ".gpx") {
+        const text = entry.getData().toString("utf8");
         const obj = parser.parse(text);
         const data = extractGPX(obj);
-        if (data) {
-          const created = await prisma.activity.create({
-            data: {
-              userId,
-              source: 'STRAVA',
-              externalId: entry.entryName,
-              name: data.name,
-              type: 'Other',
-              startDate: data.start || new Date(),
-              duration: data.duration,
-              distance: data.distance,
-              averageSpeed: data.duration && data.distance ? data.distance / data.duration : null,
-            },
-          });
+        if (!data) continue;
 
+        const pace = computePacePerKm(data.points);
 
+        const created = await prisma.activity.create({
+          data: {
+            userId,
+            source: "STRAVA",
+            externalId: entry.entryName,
+            name: data.name,
+            type: "Run",
+            startDate: data.start,
+            duration: data.duration,
+            distance: data.distance,
+            averageSpeed: data.distance / data.duration,
+            pacePerKm: pace ? pace.checkpoints : null,
+          },
+        });
 
+        createdCount++;
+        console.log("Imported GPX:", entry.entryName, "->", created.id);
+      }
 
-
-
-
-          //gps points but does not work for now
-          if (data.points && data.points.length > 0) {
-            const gpsPoints = data.points.map((p) => ({
-              activityId: created.id,
-              latitude: p.lat,
-              longitude: p.lon,
-              timestamp: p.time || new Date(),
-            }));
-
-            for (let i = 0; i < gpsPoints.length; i += 500) {
-              const batch = gpsPoints.slice(i, i + 500);
-              await prisma.gpsPoint.createMany({ data: batch });
-            }
-          }
-
-          createdCount++;
-          console.log('Imported GPX:', entry.entryName, '-> activity id', created.id);
-        }
-      } else if (ext === '.tcx') {
-        const text = entry.getData().toString('utf8');
-        const obj = parser.parse(text);
-        const data = extractTCX(obj);
-        if (data) {
-          const created = await prisma.activity.create({
-            data: {
-              userId,
-              source: 'STRAVA',
-              externalId: entry.entryName,
-              name: data.name,
-              type: 'Other',
-              startDate: data.start || new Date(),
-              duration: data.duration,
-              distance: data.distance,
-              averageSpeed: data.duration && data.distance ? data.distance / data.duration : null,
-            },
-          });
-
-          if (data.points && data.points.length > 0) {
-            const gpsPoints = data.points.map((p) => ({
-              activityId: created.id,
-              latitude: p.lat,
-              longitude: p.lon,
-              timestamp: p.time || new Date(),
-            }));
-
-            for (let i = 0; i < gpsPoints.length; i += 500) {
-              const batch = gpsPoints.slice(i, i + 500);
-              await prisma.gpsPoint.createMany({ data: batch });
-            }
-          }
-
-          createdCount++;
-          console.log('Imported TCX:', entry.entryName, '-> activity id', created.id);
-        }
-      } else if (ext === '.json') {
-        const text = entry.getData().toString('utf8');
+      if (ext === ".json") {
+        const text = entry.getData().toString("utf8");
         const obj = JSON.parse(text);
-
-
         const data = extractJsonActivity(obj);
-        if (data) {
-          const created = await prisma.activity.create({
-            data: {
-              userId,
-              source: 'STRAVA',
-              externalId: obj.id ? String(obj.id) : entry.entryName,
-              name: data.name,
-              type: obj.type || 'Other',
-              startDate: data.start || new Date(),
-              duration: data.duration,
-              distance: data.distance,
-              averageSpeed: data.duration && data.distance ? data.distance / data.duration : null,
-            },
-          });
 
-          createdCount++;
-          console.log('Imported JSON:', entry.entryName, '-> activity id', created.id);
-        }
-      } else {
-        // ignore
+        const created = await prisma.activity.create({
+          data: {
+            userId,
+            source: "STRAVA",
+            externalId: String(obj.id || entry.entryName),
+            name: data.name,
+            type: obj.type || "Other",
+            startDate: data.start,
+            duration: data.duration,
+            distance: data.distance,
+            averageSpeed:
+              data.duration && data.distance
+                ? data.distance / data.duration
+                : null,
+            pacePerKm: null,
+          },
+        });
+
+        createdCount++;
+        console.log("Imported JSON:", entry.entryName, "->", created.id);
       }
     } catch (err) {
-      console.error('Error processing', entry.entryName, err.message || err);
+      console.error("Error processing", entry.entryName, err.message);
     }
   }
 
-  console.log(`Import complete. Created ${createdCount} activities.`);
+  console.log(`\nImport complete. Created ${createdCount} activities.`);
   process.exit(0);
 }
 
 main().catch((err) => {
-  console.error('Import script error:', err);
+  console.error("Import script error:", err);
   process.exit(1);
 });
