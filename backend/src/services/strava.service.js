@@ -60,18 +60,24 @@ class StravaService {
     }
   }
 
-  async getActivities(accessToken, page = 1, perPage = 200) {
+  async getActivities(accessToken, page = 1, perPage = 200, after = null) {
     try {
+      const params = {
+        page,
+        per_page: perPage,
+      };
+
+      if (after) {
+        params.after = after;
+      }
+
       const response = await axios.get(
         `${STRAVA_API_BASE}/athlete/activities`,
         {
           headers: {
             Authorization: `Bearer ${accessToken}`,
           },
-          params: {
-            page,
-            per_page: perPage,
-          },
+          params,
         },
       );
 

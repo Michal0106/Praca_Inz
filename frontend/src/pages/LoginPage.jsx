@@ -82,8 +82,6 @@ function LoginPage() {
           </form>
 
           <div className="auth-links">
-            <Link to="/forgot-password">Zapomniałeś hasła?</Link>
-            <span className="separator">•</span>
             <Link to="/register">Nie masz konta? Zarejestruj się</Link>
           </div>
 

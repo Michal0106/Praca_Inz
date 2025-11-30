@@ -4,12 +4,16 @@ import { getUserId } from "../utils/auth.utils.js";
 export const getRecommendedPlan = async (req, res) => {
   try {
     const userId = getUserId(req);
+    console.log(`[Training Plan] User ID: ${userId}`);
 
     const userStats = await prisma.userStats.findUnique({
       where: { userId },
     });
 
+    console.log(`[Training Plan] User stats:`, userStats);
+
     if (!userStats || userStats.totalActivities === 0) {
+      console.log(`[Training Plan] Insufficient data for user ${userId}`);
       return res.status(404).json({
         error: "Insufficient data",
         message:

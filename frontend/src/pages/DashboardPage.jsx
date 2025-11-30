@@ -4,12 +4,20 @@ import { RefreshCw, LogOut } from "lucide-react";
 import Layout from "../components/Layout";
 import GlobalFilters from "../components/GlobalFilters";
 import { useFilters } from "../context/FilterContext";
+import { useAuth } from "../hooks/useAuth";
 import { authAPI, activitiesAPI } from "../services/api";
 import "./DashboardPage.css";
 
 function DashboardPage() {
+  const { isLoading: authLoading } = useAuth();
   const [user, setUser] = useState(null);
   const [activities, setActivities] = useState([]);
+  const [filteredStats, setFilteredStats] = useState({
+    totalActivities: 0,
+    totalDistance: 0,
+    totalDuration: 0,
+    totalElevationGain: 0,
+  });
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const navigate = useNavigate();
@@ -26,7 +34,6 @@ if (params.get("auth") === "success") {
       window.location.replace("/dashboard");
   }
 }
-
 
   useEffect(() => {
     fetchUserData();
@@ -55,7 +62,7 @@ if (params.get("auth") === "success") {
 
   const fetchActivities = async () => {
     try {
-      const params = { limit: 50 };
+      const params = { limit: 1000 }; 
 
       if (activityType !== "all") {
         params.type = activityType;
@@ -70,9 +77,25 @@ if (params.get("auth") === "success") {
       }
 
       const activitiesData = await activitiesAPI.getActivities(params);
-      setActivities(activitiesData.data.activities);
+      const fetchedActivities = activitiesData.data.activities || [];
+      
+      setActivities(fetchedActivities.slice(0, 50));
+
+      const stats = {
+        totalActivities: fetchedActivities.length,
+        totalDistance: fetchedActivities.reduce((sum, a) => sum + (a.distance || 0), 0),
+        totalDuration: fetchedActivities.reduce((sum, a) => sum + (a.duration || 0), 0),
+        totalElevationGain: fetchedActivities.reduce((sum, a) => sum + (a.elevationGain || 0), 0),
+      };
+      setFilteredStats(stats);
     } catch (error) {
       console.error("Fetch activities error:", error);
+      setFilteredStats({
+        totalActivities: 0,
+        totalDistance: 0,
+        totalDuration: 0,
+        totalElevationGain: 0,
+      });
     }
   };
 
@@ -126,7 +149,7 @@ if (params.get("auth") === "success") {
     }
   };
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <Layout>
         <div className="loading">Ładowanie...</div>
@@ -176,24 +199,25 @@ if (params.get("auth") === "success") {
         <div className="stats-grid">
           <div className="stat-card">
             <h3>Łączna liczba treningów</h3>
-            <p className="stat-value">{user?.stats?.totalActivities || 0}</p>
+            <p className="stat-value">{filteredStats?.totalActivities || 0}</p>
           </div>
           <div className="stat-card">
             <h3>Całkowity dystans</h3>
             <p className="stat-value">
-              {((user?.stats?.totalDistance || 0) / 1000).toFixed(1)} km
+              {((filteredStats?.totalDistance || 0) / 1000).toFixed(1)} km
             </p>
           </div>
           <div className="stat-card">
             <h3>Całkowity czas</h3>
             <p className="stat-value">
-              {Math.floor((user?.stats?.totalDuration || 0) / 3600)} godz.
+              {Math.floor((filteredStats?.totalDuration || 0) / 3600)} godz.{" "}
+              {Math.floor(((filteredStats?.totalDuration || 0) % 3600) / 60)} min
             </p>
           </div>
           <div className="stat-card">
             <h3>Suma podejść</h3>
             <p className="stat-value">
-              {(user?.stats?.totalElevationGain || 0).toFixed(0)} m
+              {(filteredStats?.totalElevationGain || 0).toFixed(0)} m
             </p>
           </div>
         </div>

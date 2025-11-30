@@ -10,10 +10,12 @@ import {
   CheckCircle,
 } from "lucide-react";
 import Layout from "../components/Layout";
+import { useAuth } from "../hooks/useAuth";
 import { authAPI, activitiesAPI } from "../services/api";
 import "./AccountPage.css";
 
 function AccountPage() {
+  const { isLoading: authLoading } = useAuth();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [linking, setLinking] = useState(false);
@@ -114,7 +116,7 @@ function AccountPage() {
     }
   };
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <Layout>
         <div className="loading">Ładowanie...</div>
@@ -157,13 +159,24 @@ function AccountPage() {
           <div className="account-section">
             <h2>Informacje o koncie</h2>
             <div className="info-grid">
-              <div className="info-item">
-                <Mail size={20} />
-                <div>
-                  <label>Email</label>
-                  <p>{user?.email}</p>
+              {user?.email && (
+                <div className="info-item">
+                  <Mail size={20} />
+                  <div>
+                    <label>Email</label>
+                    <p>{user.email}</p>
+                  </div>
                 </div>
-              </div>
+              )}
+              {user?.isStravaEmail && (
+                <div className="info-item">
+                  <Mail size={20} />
+                  <div>
+                    <label>Email</label>
+                    <p className="text-muted">Zalogowano przez Strava</p>
+                  </div>
+                </div>
+              )}
               {user?.firstName && (
                 <div className="info-item">
                   <User size={20} />

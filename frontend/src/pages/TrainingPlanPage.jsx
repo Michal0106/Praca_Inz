@@ -19,6 +19,7 @@ function TrainingPlanPage() {
   const [allTemplates, setAllTemplates] = useState([]);
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [selectedSession, setSelectedSession] = useState(null);
   const [sessionIntervals, setSessionIntervals] = useState(null);
@@ -32,21 +33,39 @@ function TrainingPlanPage() {
 
   const fetchData = async () => {
     try {
+      setError(null);
       const [recommendRes, templatesRes] = await Promise.all([
-        trainingPlanAPI.getRecommended(),
+        trainingPlanAPI.getRecommended().catch(err => {
+          if (err.response?.status === 404) {
+            return { data: { error: 'no_data' } };
+          }
+          throw err;
+        }),
         trainingPlanAPI.getTemplates({}),
       ]);
 
-      setRecommendedPlan(recommendRes.data.recommendedPlan);
-      setAlternativePlans(recommendRes.data.alternativePlans || []);
-      setUserProfile(recommendRes.data.userProfile);
+      if (recommendRes.data.error === 'no_data') {
+        setError({
+          type: 'no_activities',
+          message: 'Zsynchronizuj aktywności ze Stravą, aby otrzymać spersonalizowane rekomendacje planów treningowych.'
+        });
+      } else {
+        setRecommendedPlan(recommendRes.data.recommendedPlan);
+        setAlternativePlans(recommendRes.data.alternativePlans || []);
+        setUserProfile(recommendRes.data.userProfile);
+        setSelectedPlan(recommendRes.data.recommendedPlan);
+      }
+      
       setAllTemplates(templatesRes.data.templates || []);
-      setSelectedPlan(recommendRes.data.recommendedPlan);
     } catch (error) {
       if (error.response?.status === 401) {
         navigate("/");
       }
       console.error("Fetch plan error:", error);
+      setError({
+        type: 'fetch_error',
+        message: 'Błąd podczas ładowania planów treningowych. Spróbuj ponownie później.'
+      });
     } finally {
       setLoading(false);
     }
@@ -134,6 +153,29 @@ function TrainingPlanPage() {
     return (
       <Layout>
         <div className="loading">Ładowanie planu treningowego...</div>
+      </Layout>
+    );
+  }
+
+  if (error && error.type === 'no_activities') {
+    return (
+      <Layout>
+        <div className="training-plan-page">
+          <div className="page-header">
+            <h1>Plan treningowy</h1>
+          </div>
+          <div className="empty-state">
+            <Target size={64} />
+            <h2>Brak danych do analizy</h2>
+            <p>{error.message}</p>
+            <button 
+              className="btn-primary" 
+              onClick={() => navigate('/dashboard')}
+            >
+              Przejdź do Panelu głównego
+            </button>
+          </div>
+        </div>
       </Layout>
     );
   }

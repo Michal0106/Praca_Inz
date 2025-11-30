@@ -1,7 +1,9 @@
+import passport from "../config/passport.js";
 import bcrypt from "bcryptjs";
 import prisma from "../config/database.js";
 import { stravaService } from "../services/strava.service.js";
 import { jwtService } from "../services/jwt.service.js";
+import { emailService } from "../services/email.service.js";
 
 
 export const register = async (req, res) => {
@@ -36,9 +38,17 @@ export const register = async (req, res) => {
         password: hashedPassword,
         firstName,
         lastName,
+        isEmailVerified: false,
         userStats: { create: {} }
       },
     });
+
+
+    try {
+      await emailService.sendWelcomeEmail(email, firstName);
+    } catch (emailError) {
+      console.error("Failed to send welcome email:", emailError);
+    }
 
     res.status(201).json({
       message: "Registration successful. You can now log in.",
@@ -145,9 +155,102 @@ export const logout = async (req, res) => {
   }
 };
 
+export const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
 
+    if (!email) {
+      return res.status(400).json({ error: "Email is required" });
+    }
 
+    const user = await prisma.user.findUnique({
+      where: { email },
+    });
 
+    if (!user) {
+      return res.json({
+        message: "If the email exists, a password reset link has been sent",
+      });
+    }
+
+    const resetToken = jwtService.generatePasswordResetToken();
+    const resetExpires = new Date();
+    resetExpires.setHours(resetExpires.getHours() + 1); 
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        resetPasswordToken: resetToken,
+        resetPasswordExpires: resetExpires,
+      },
+    });
+
+    try {
+      await emailService.sendPasswordResetEmail(email, resetToken);
+    } catch (emailError) {
+      console.error("Failed to send reset email:", emailError);
+    }
+
+    res.json({
+      message: "If the email exists, a password reset link has been sent",
+    });
+  } catch (error) {
+    console.error("Forgot password error:", error);
+    res.status(500).json({ error: "Failed to process password reset request" });
+  }
+};
+
+export const resetPassword = async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return res
+        .status(400)
+        .json({ error: "Token and new password are required" });
+    }
+
+    if (newPassword.length < 8) {
+      return res
+        .status(400)
+        .json({ error: "Password must be at least 8 characters long" });
+    }
+
+    const user = await prisma.user.findFirst({
+      where: {
+        resetPasswordToken: token,
+        resetPasswordExpires: {
+          gt: new Date(),
+        },
+      },
+    });
+
+    if (!user) {
+      return res.status(400).json({ error: "Invalid or expired reset token" });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: hashedPassword,
+        resetPasswordToken: null,
+        resetPasswordExpires: null,
+      },
+    });
+
+    await jwtService.revokeAllUserTokens(user.id);
+
+    res.json({
+      message:
+        "Password reset successful. Please log in with your new password.",
+    });
+  } catch (error) {
+    console.error("Reset password error:", error);
+    res.status(500).json({ error: "Password reset failed" });
+  }
+};
 
 export const getCurrentUser = async (req, res) => {
   try {
@@ -162,6 +265,7 @@ export const getCurrentUser = async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
+    // Ukryj dummy email od Strava
     const isStravaEmail = user.email && user.email.includes('@strava.local');
     const displayEmail = isStravaEmail ? null : user.email;
 
@@ -229,6 +333,7 @@ export const stravaCallback = async (req, res) => {
     const emailSafe = athlete.email || `strava_${stravaId}@strava.local`;
 
 
+    // 1)pinned to account
 
     if (mode === "connect") {
       const userId = stateData.userId;
@@ -249,18 +354,21 @@ export const stravaCallback = async (req, res) => {
         },
       });
 
+      // Automatyczna synchronizacja aktywności po połączeniu
       try {
         console.log(`Starting automatic sync for user ${userId} after Strava connection...`);
         await syncStravaActivities(userId, access_token);
         console.log(`Automatic sync completed for user ${userId}`);
       } catch (syncError) {
         console.error('Auto-sync error:', syncError);
+        // Nie przerywamy procesu - sync można wykonać później ręcznie
       }
 
       return res.redirect(`${process.env.CLIENT_URL}/account?strava=linked`);
     }
 
 
+    // 2)logging through strava
 
     let user = await prisma.user.findUnique({
       where: { stravaId },
@@ -282,6 +390,7 @@ export const stravaCallback = async (req, res) => {
         },
       });
       
+      // Automatyczna synchronizacja dla nowego użytkownika
       try {
         console.log(`Starting automatic sync for new user ${user.id}...`);
         await syncStravaActivities(user.id, access_token);
@@ -306,6 +415,7 @@ export const stravaCallback = async (req, res) => {
 
 
 
+    // tokens
     req.session = null;
 
     const jwtAccess = jwtService.generateAccessToken(user.id);
@@ -352,36 +462,13 @@ export const unlinkStrava = async (req, res) => {
 async function syncStravaActivities(userId, accessToken) {
   try {
     console.log(`Fetching activities from Strava for user ${userId}...`);
-    
-    // Pobierz wszystkie aktywności z paginacją
-    let allStravaActivities = [];
-    let page = 1;
-    let hasMore = true;
-
-    while (hasMore) {
-      console.log(`Fetching page ${page}...`);
-      const pageActivities = await stravaService.getActivities(accessToken, page, 200);
-      
-      if (pageActivities.length === 0) {
-        hasMore = false;
-      } else {
-        allStravaActivities = allStravaActivities.concat(pageActivities);
-        console.log(`Page ${page}: ${pageActivities.length} activities (total: ${allStravaActivities.length})`);
-        
-        if (pageActivities.length < 200) {
-          hasMore = false;
-        } else {
-          page++;
-        }
-      }
-    }
-    
-    console.log(`Fetched ${allStravaActivities.length} total activities from Strava`);
+    const stravaActivities = await stravaService.getActivities(accessToken);
+    console.log(`Fetched ${stravaActivities.length} activities from Strava`);
 
     let newCount = 0;
     let existingCount = 0;
 
-    for (const activity of allStravaActivities) {
+    for (const activity of stravaActivities) {
       const existing = await prisma.activity.findUnique({
         where: {
           externalId_source: {
@@ -414,17 +501,13 @@ async function syncStravaActivities(userId, accessToken) {
           },
         });
         newCount++;
-        
-        if (newCount % 50 === 0) {
-          console.log(`Saved ${newCount} activities...`);
-        }
+        console.log(`Saved new activity: ${activity.name}`);
       } else {
         existingCount++;
       }
     }
 
-    console.log(`Initial sync completed: ${newCount} new, ${existingCount} existing activities`);
-
+    // Aktualizacja statystyk użytkownika
     const activities = await prisma.activity.findMany({
       where: { userId },
       select: {

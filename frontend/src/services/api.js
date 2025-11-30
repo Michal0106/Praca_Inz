@@ -5,9 +5,53 @@ const api = axios.create({
   withCredentials: true,
 });
 
+const isTokenExpired = (token) => {
+  if (!token) return true;
+  
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    const expirationTime = payload.exp * 1000; 
+    const currentTime = Date.now();
+    
+    return expirationTime < (currentTime + 5 * 60 * 1000);
+  } catch (error) {
+    return true;
+  }
+};
+
+const refreshAccessToken = async () => {
+  const refreshToken = localStorage.getItem("refreshToken");
+  if (!refreshToken) {
+    throw new Error("No refresh token");
+  }
+
+  const response = await axios.post(
+    `${import.meta.env.VITE_API_URL || "http://localhost:3001/api"}/auth/refresh`,
+    { refreshToken },
+  );
+
+  const { accessToken } = response.data;
+  localStorage.setItem("accessToken", accessToken);
+  return accessToken;
+};
+
 api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem("accessToken");
+  async (config) => {
+    let token = localStorage.getItem("accessToken");
+    
+    if (token && isTokenExpired(token)) {
+      try {
+        token = await refreshAccessToken();
+      } catch (error) {
+        console.error("Failed to refresh token:", error);
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("refreshToken");
+        localStorage.removeItem("user");
+        window.location.href = "/login";
+        return Promise.reject(error);
+      }
+    }
+    
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -25,22 +69,11 @@ api.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        const refreshToken = localStorage.getItem("refreshToken");
-        if (!refreshToken) {
-          throw new Error("No refresh token");
-        }
-
-        const response = await axios.post(
-          `${import.meta.env.VITE_API_URL || "http://localhost:3001/api"}/auth/refresh`,
-          { refreshToken },
-        );
-
-        const { accessToken } = response.data;
-        localStorage.setItem("accessToken", accessToken);
-
-        originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+        const token = await refreshAccessToken();
+        originalRequest.headers.Authorization = `Bearer ${token}`;
         return api(originalRequest);
       } catch (refreshError) {
+        console.error("Failed to refresh token on 401:", refreshError);
         localStorage.removeItem("accessToken");
         localStorage.removeItem("refreshToken");
         localStorage.removeItem("user");
@@ -60,15 +93,31 @@ export const authAPI = {
     const refreshToken = localStorage.getItem("refreshToken");
     return api.post("/auth/logout", { refreshToken });
   },
-  verifyEmail: (token) => api.post("/auth/verify-email", { token }),
-  resendVerification: (email) =>
-    api.post("/auth/resend-verification", { email }),
-  forgotPassword: (email) => api.post("/auth/forgot-password", { email }),
-  resetPassword: (token, newPassword) =>
-    api.post("/auth/reset-password", { token, newPassword }),
   getCurrentUser: () => api.get("/auth/me"),
   refresh: (refreshToken) => api.post("/auth/refresh", { refreshToken }),
   unlinkStrava: () => api.post("/auth/strava/unlink"),
+  initAuth: async () => {
+    const token = localStorage.getItem("accessToken");
+    const refreshToken = localStorage.getItem("refreshToken");
+    
+    if (!token && !refreshToken) {
+      return false;
+    }
+    
+    if (token && isTokenExpired(token)) {
+      try {
+        await refreshAccessToken();
+      } catch (error) {
+        console.error("Failed to refresh token on init:", error);
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("refreshToken");
+        localStorage.removeItem("user");
+        return false;
+      }
+    }
+    
+    return true;
+  },
 };
 
 export const activitiesAPI = {

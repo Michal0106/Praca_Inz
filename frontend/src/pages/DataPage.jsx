@@ -104,7 +104,7 @@ function DataPage() {
         params.endDate = dateRange.end.toISOString();
       }
 
-      const [longestRes, hardestRes] = await Promise.all([
+      const [longestRes, hardestRes, activitiesRes] = await Promise.all([
         dataAPI.getLongestActivity(metric, params),
         dataAPI.getHardestActivity(params),
         activitiesAPI.getActivities(params),

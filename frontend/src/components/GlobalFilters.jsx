@@ -10,22 +10,13 @@ function GlobalFilters({
   const {
     activityType,
     setActivityType,
-    period,
-    setPeriod,
     metric,
     setMetric,
+    dateRange,
+    setDateRange,
     availableTypes,
     resetFilters,
   } = useFilters();
-
-  const periodOptions = [
-    { value: "7", label: "Ostatnie 7 dni" },
-    { value: "30", label: "Ostatnie 30 dni" },
-    { value: "90", label: "Ostatnie 3 miesiące" },
-    { value: "180", label: "Ostatnie 6 miesięcy" },
-    { value: "365", label: "Ostatni rok" },
-    { value: "all", label: "Wszystkie dane" },
-  ];
 
   const metricOptions = [
     { value: "distance", label: "Dystans" },
@@ -36,8 +27,27 @@ function GlobalFilters({
     { value: "calories", label: "Kalorie" },
   ];
 
+  const formatDateForInput = (date) => {
+    if (!date) return '';
+    const d = new Date(date);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const handleStartDateChange = (e) => {
+    const newStart = e.target.value ? new Date(e.target.value) : null;
+    setDateRange({ ...dateRange, start: newStart });
+  };
+
+  const handleEndDateChange = (e) => {
+    const newEnd = e.target.value ? new Date(e.target.value) : null;
+    setDateRange({ ...dateRange, end: newEnd });
+  };
+
   const hasActiveFilters =
-    activityType !== "all" || period !== "30" || metric !== "distance";
+    activityType !== "all" || metric !== "distance";
 
   return (
     <div className="global-filters">
@@ -76,22 +86,30 @@ function GlobalFilters({
 
         {showPeriod && (
           <div className="filter-group">
-            <label htmlFor="period">
+            <label>
               <Calendar size={16} />
               Okres
             </label>
-            <select
-              id="period"
-              value={period}
-              onChange={(e) => setPeriod(e.target.value)}
-              className="filter-select"
-            >
-              {periodOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+            <div className="date-range-inputs">
+              <div className="date-input-wrapper">
+                <span className="date-label">Od</span>
+                <input
+                  type="date"
+                  value={formatDateForInput(dateRange.start)}
+                  onChange={handleStartDateChange}
+                  className="filter-date-input"
+                />
+              </div>
+              <div className="date-input-wrapper">
+                <span className="date-label">Do</span>
+                <input
+                  type="date"
+                  value={formatDateForInput(dateRange.end)}
+                  onChange={handleEndDateChange}
+                  className="filter-date-input"
+                />
+              </div>
+            </div>
           </div>
         )}
 
@@ -119,11 +137,6 @@ function GlobalFilters({
           <span className="filters-count">
             {activityType !== "all" && (
               <span className="filter-badge">{activityType}</span>
-            )}
-            {period !== "30" && (
-              <span className="filter-badge">
-                {periodOptions.find((p) => p.value === period)?.label}
-              </span>
             )}
             {metric !== "distance" && (
               <span className="filter-badge">

@@ -37,32 +37,21 @@ function AnalyticsPage() {
   const [intensityData, setIntensityData] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
-  const { period, activityType } = useFilters();
+  const { dateRange, activityType } = useFilters();
 
   useEffect(() => {
     fetchAnalytics();
-  }, [period, activityType]);
+  }, [dateRange, activityType]);
 
   const fetchAnalytics = async () => {
     try {
       let weeks = 12;
       let months = 6;
 
-      if (period === "7") {
-        weeks = 1;
-        months = 1;
-      } else if (period === "30") {
-        weeks = 4;
-        months = 1;
-      } else if (period === "90") {
-        weeks = 12;
-        months = 3;
-      } else if (period === "180") {
-        weeks = 24;
-        months = 6;
-      } else if (period === "365") {
-        weeks = 52;
-        months = 12;
+      if (dateRange.start && dateRange.end) {
+        const daysDiff = Math.ceil((dateRange.end - dateRange.start) / (1000 * 60 * 60 * 24));
+        weeks = Math.max(1, Math.ceil(daysDiff / 7));
+        months = Math.max(1, Math.ceil(daysDiff / 30));
       }
 
       const params = {};

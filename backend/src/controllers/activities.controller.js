@@ -48,11 +48,22 @@ export const getActivities = async (req, res) => {
 
 export const syncActivities = async (req, res) => {
   try {
+    console.log('=== SYNC ACTIVITIES START ===');
+    console.log('req.user:', req.user);
+    console.log('req.session:', req.session);
+    
     const userId = getUserId(req);
     console.log(`User ID: ${userId}`);
 
+    if (!userId) {
+      console.error('No user ID found in request');
+      return res.status(401).json({
+        error: 'User not authenticated',
+      });
+    }
+
     const accessToken = await getStravaToken(req);
-    console.log(`Access Token: ${accessToken ? " Present" : " Missing"}`);
+    console.log(`Access Token: ${accessToken ? "Present" : "Missing"}`);
 
     const source = req.session?.source || "STRAVA";
 
@@ -69,12 +80,61 @@ export const syncActivities = async (req, res) => {
     let updatedActivities = 0;
 
     if (source === "STRAVA") {
-      console.log(`Starting sync for user ${userId}...`);
+      console.log(`Starting incremental sync for user ${userId}...`);
 
-      const stravaActivities = await stravaService.getActivities(accessToken);
-      console.log(`Fetched ${stravaActivities.length} activities from Strava`);
+      const lastActivity = await prisma.activity.findFirst({
+        where: {
+          userId,
+          source: "STRAVA",
+        },
+        orderBy: {
+          startDate: "desc",
+        },
+        select: {
+          startDate: true,
+        },
+      });
 
-      for (const activity of stravaActivities) {
+      const afterTimestamp = lastActivity 
+        ? Math.floor(lastActivity.startDate.getTime() / 1000)
+        : undefined;
+
+      if (afterTimestamp) {
+        console.log(`Fetching activities after ${lastActivity.startDate.toISOString()}...`);
+      } else {
+        console.log(`No previous activities found - this shouldn't happen. Activities should be synced during Strava connection.`);
+      }
+
+      let allStravaActivities = [];
+      let page = 1;
+      let hasMore = true;
+
+      while (hasMore) {
+        console.log(`Fetching page ${page}...`);
+        const pageActivities = await stravaService.getActivities(
+          accessToken, 
+          page, 
+          200,
+          afterTimestamp  
+        );
+        
+        if (pageActivities.length === 0) {
+          hasMore = false;
+        } else {
+          allStravaActivities = allStravaActivities.concat(pageActivities);
+          console.log(`Page ${page}: ${pageActivities.length} activities (total: ${allStravaActivities.length})`);
+          
+          if (pageActivities.length < 200) {
+            hasMore = false;
+          } else {
+            page++;
+          }
+        }
+      }
+
+      console.log(`Fetched ${allStravaActivities.length} new activities from Strava`);
+
+      for (const activity of allStravaActivities) {
         const existing = await prisma.activity.findUnique({
         where: {
           externalId_source: {
@@ -90,10 +150,14 @@ export const syncActivities = async (req, res) => {
 
         if (!existing) {
           console.log(`Fetching details for activity ${activity.id}...`);
-          const detailedActivity = await stravaService.getActivity(
-            accessToken,
-            activity.id,
-          );
+          
+          try {
+            await new Promise(resolve => setTimeout(resolve, 250));
+            
+            const detailedActivity = await stravaService.getActivity(
+              accessToken,
+              activity.id,
+            );
 
           const created = await prisma.activity.create({
             data: {
@@ -132,7 +196,7 @@ export const syncActivities = async (req, res) => {
 
           const rawType = activity.type?.toLowerCase() || "";
 
-          console.log("TYPE RAW:", rawType, "DIST:", activity.distance); //debugging
+          console.log("TYPE RAW:", rawType, "DIST:", activity.distance); 
 
           const isRunning =
             rawType.includes("run") ||       
@@ -146,6 +210,39 @@ export const syncActivities = async (req, res) => {
 
           newActivities.push(created);
           console.log(`Saved activity: ${activity.name}`);
+          } catch (detailError) {
+            if (detailError.response?.status === 429) {
+              console.log(`⚠️  Rate limit hit. Zapisuję podstawowe dane aktywności bez szczegółów.`);
+              const created = await prisma.activity.create({
+                data: {
+                  userId,
+                  externalId: activity.id.toString(),
+                  source: "STRAVA",
+                  name: activity.name,
+                  type: activity.type,
+                  startDate: new Date(activity.start_date),
+                  duration: activity.moving_time,
+                  distance: activity.distance,
+                  averageHeartRate: activity.average_heartrate,
+                  maxHeartRate: activity.max_heartrate,
+                  averageSpeed: activity.average_speed,
+                  maxSpeed: activity.max_speed,
+                  elevationGain: activity.total_elevation_gain,
+                  calories: activity.calories,
+                  averagePower: activity.average_watts,
+                  maxPower: activity.max_watts,
+                  trainingLoad: activity.suffer_score,
+                },
+              });
+              newActivities.push(created);
+              console.log(`✓ Saved basic activity data: ${activity.name}`);
+              
+              console.log(`⏸  Pausing sync due to rate limit. ${newActivities.length} new activities saved.`);
+              break;
+            } else {
+              console.error(`Error fetching details for ${activity.id}:`, detailError.message);
+            }
+          }
         } else {
           updatedActivities++;
 
@@ -178,9 +275,11 @@ export const syncActivities = async (req, res) => {
     });
   } catch (error) {
     console.error("Sync activities error:", error);
+    console.error("Error stack:", error.stack);
     res.status(500).json({
       error: "Failed to sync activities",
       details: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
     });
   }
 };
@@ -424,8 +523,8 @@ async function calculatePaceDistances(
     console.log("STREAMS KEYS:", streams ? Object.keys(streams) : "NO STREAMS");
 
     if (streams?.distance?.data && streams?.time?.data) {
-      const distances = streams.distance.data; // metry, narastająco
-      const times = streams.time.data;         // sekundy, narastająco
+      const distances = streams.distance.data; 
+      const times = streams.time.data;      
 
 
       const targetDistances = {
@@ -470,7 +569,6 @@ async function calculatePaceDistances(
       }
 
 
-      // tempo na kilometr tablica
       const maxDist = distances[distances.length - 1];
       const kmCount = Math.floor(maxDist / 1000);
       const perKm = [];
@@ -492,7 +590,7 @@ async function calculatePaceDistances(
         const timeSegment = times[j] - lastTime;
 
         if (distSegment > 0 && timeSegment > 0) {
-          const pace = (timeSegment / 60) / (distSegment / 1000); // min/km
+          const pace = (timeSegment / 60) / (distSegment / 1000); 
           if (pace > 0 && pace < 20) {
             perKm.push(Math.round(pace * 100) / 100);
           }
@@ -503,7 +601,6 @@ async function calculatePaceDistances(
         lastTime = times[j];
       }
 
-      //zapis
       if (Object.keys(paceData).length > 0) {
         await prisma.paceDistance.create({
           data: {
@@ -515,7 +612,6 @@ async function calculatePaceDistances(
         console.log(`Calculated pace distances:`, paceData);
       }
 
-      // zapis do activity
       if (perKm.length > 0) {
         await prisma.activity.update({
           where: { id: activityId },
@@ -536,7 +632,7 @@ async function calculatePaceDistances(
 
       if (activity && activity.distance > 0 && activity.duration > 0) {
         const avgPace =
-          activity.duration / 60 / (activity.distance / 1000); // min/km
+          activity.duration / 60 / (activity.distance / 1000);
         const paceData = {};
 
         const targetDistances = {
@@ -554,8 +650,6 @@ async function calculatePaceDistances(
         }
 
 
-        
-        // PaceDistance
         if (Object.keys(paceData).length > 0) {
           await prisma.paceDistance.create({
             data: {
@@ -570,7 +664,6 @@ async function calculatePaceDistances(
           );
         }
 
-        // pacePerKm jako tablica średnich
         const kmCount = Math.floor(activity.distance / 1000);
         if (kmCount > 0) {
           const perKm = Array(kmCount).fill(

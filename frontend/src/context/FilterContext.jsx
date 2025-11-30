@@ -13,7 +13,6 @@ export const useFilters = () => {
 
 export const FilterProvider = ({ children }) => {
   const [activityType, setActivityType] = useState("all");
-  const [period, setPeriod] = useState("30");
   const [metric, setMetric] = useState("distance");
   const [availableTypes, setAvailableTypes] = useState([]);
   const [dateRange, setDateRange] = useState({
@@ -23,6 +22,10 @@ export const FilterProvider = ({ children }) => {
 
   useEffect(() => {
     fetchActivityTypes();
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - 30);
+    setDateRange({ start, end });
   }, []);
 
   const fetchActivityTypes = async () => {
@@ -34,34 +37,13 @@ export const FilterProvider = ({ children }) => {
     }
   };
 
-  useEffect(() => {
-    if (period === "custom") return;
-
-    const end = new Date();
-    const start = new Date();
-
-    if (period === "7") {
-      start.setDate(start.getDate() - 7);
-    } else if (period === "30") {
-      start.setDate(start.getDate() - 30);
-    } else if (period === "90") {
-      start.setDate(start.getDate() - 90);
-    } else if (period === "180") {
-      start.setDate(start.getDate() - 180);
-    } else if (period === "365") {
-      start.setDate(start.getDate() - 365);
-    } else if (period === "all") {
-      start.setFullYear(2000);
-    }
-
-    setDateRange({ start, end });
-  }, [period]);
-
   const resetFilters = () => {
     setActivityType("all");
-    setPeriod("30");
     setMetric("distance");
-    setDateRange({ start: null, end: null });
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - 30);
+    setDateRange({ start, end });
   };
 
   const getFilterParams = () => {
@@ -80,7 +62,6 @@ export const FilterProvider = ({ children }) => {
     }
 
     params.metric = metric;
-    params.period = period;
 
     return params;
   };
@@ -88,8 +69,6 @@ export const FilterProvider = ({ children }) => {
   const value = {
     activityType,
     setActivityType,
-    period,
-    setPeriod,
     metric,
     setMetric,
     dateRange,

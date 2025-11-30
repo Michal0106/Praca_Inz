@@ -4,6 +4,9 @@
   "description": "Backend for training analytics application",
   "main": "src/server.js",
   "type": "module",
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  },
   "scripts": {
     "start": "node --env-file=.env src/server.js",
     "dev": "nodemon --env-file=.env src/server.js",

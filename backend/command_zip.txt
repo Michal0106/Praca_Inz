@@ -1,3 +1,0 @@
-node -r dotenv/config scripts/importStravaZip.js <path to zip> <user id from db>
-
-npx prisma studio  - to have a look at db
