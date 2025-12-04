@@ -325,7 +325,6 @@ const PaceConsistencySection = ({ first, second }) => {
       label = "równy bieg (even split)";
     }
 
-    // tu używamy krótszego formatu, bez "/km"
     return `${label}, Δ ${formatSecondsShort(stats.splitDeltaSeconds)}`;
   };
 
@@ -339,7 +338,7 @@ const PaceConsistencySection = ({ first, second }) => {
           <YAxis />
           <Tooltip />
           <Legend />
-          {/* KOLORY SŁUPKÓW */}
+
           <Bar dataKey="first" name="Trening 1" fill="#4f46e5" />
           <Bar dataKey="second" name="Trening 2" fill="#10b981" />
         </BarChart>
@@ -492,7 +491,9 @@ const PaceConsistencySection = ({ first, second }) => {
               </div>
             </div>
 
-            {/* dystans / czas / prędkosc */}
+
+            {/* WYKRES 1*/}
+            {/* dystans / czas / predkosc */}
             {summaryChartData.length > 0 && (
               <div className="compare-chart-card">
                 <h3>Porównanie obciążeń (dystans / czas / prędkość)</h3>
@@ -520,6 +521,8 @@ const PaceConsistencySection = ({ first, second }) => {
               </div>
             )}
 
+
+            {/* WYKRES 2*/}
             {/*  tempo na km  */}
             <div className="compare-chart-card">
               <h3>Tempo na poszczególnych kilometrach</h3>
@@ -536,6 +539,7 @@ const PaceConsistencySection = ({ first, second }) => {
                       labelFormatter={(label) => `Kilometr ${label}`}
                     />
                     <Legend />
+
                     <Line
                       type="monotone"
                       dataKey="first"
@@ -561,30 +565,36 @@ const PaceConsistencySection = ({ first, second }) => {
             </div>
 
 
-
-            {/* NOWA SEKCJA – stabilność + split */}
+            {/* WYKRES 3*/}
+            {/*stabilnosc + split */}
             <div className="compare-chart-card">
               <PaceConsistencySection
                 first={comparison.first}
                 second={comparison.second}
               />
             </div>
-                    
-            {/* NOWA SEKCJA – strefy tempa */}
+
+
+            {/* WYKRES 4*/}
+            {/* strefy tempa */}
             <div className="compare-chart-card">
               <PaceZonesSection
                 first={comparison.first}
                 second={comparison.second}
               />
             </div>
-                    
-            {/* NOWA SEKCJA – wspinaczkowa */}
+
+            
+            {/* WYKRES 5*/}
+            {/* sekcja wspinaczkowa */}
             <div className="compare-chart-card">
               <ClimbMetricsSection
                 first={comparison.first}
                 second={comparison.second}
               />
             </div>
+
+
             {/* TABELA PARAMETROW */}
             <div className="compare-table-wrapper">
               <h3>Porównanie parametrów</h3>

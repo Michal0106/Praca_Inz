@@ -76,6 +76,8 @@ const computePaceStats = (pacePerKmRaw) => {
   };
 };
 
+
+
 const computePaceZones = (pacePerKmRaw) => {
   const pacePerKm = Array.isArray(pacePerKmRaw)
     ? pacePerKmRaw.filter((v) => typeof v === "number" && v > 0)
@@ -113,6 +115,8 @@ const computePaceZones = (pacePerKmRaw) => {
   };
 };
 
+
+
 const computeClimbMetrics = (activity) => {
   const { elevationGain, distance, duration } = activity;
 
@@ -144,6 +148,7 @@ const computeClimbMetrics = (activity) => {
       avgGradientPercent != null ? round(avgGradientPercent, 2) : null,
   };
 };
+
 
 
 
@@ -195,6 +200,8 @@ export const getActivityDistribution = async (req, res) => {
   }
 };
 
+
+
 export const getWeeklyStats = async (req, res) => {
   try {
     const userId = getUserId(req);
@@ -213,6 +220,8 @@ export const getWeeklyStats = async (req, res) => {
       where.type = type;
     }
 
+
+
     const activities = await prisma.activity.findMany({
       where,
       select: {
@@ -223,6 +232,8 @@ export const getWeeklyStats = async (req, res) => {
         elevationGain: true,
       },
     });
+
+
 
     const weeklyMap = new Map();
     activities.forEach((activity) => {
@@ -253,6 +264,8 @@ export const getWeeklyStats = async (req, res) => {
       stats.total_elevation += activity.elevationGain || 0;
     });
 
+
+
     const weeklyStats = Array.from(weeklyMap.values())
       .map((stats) => ({
         week: stats.week,
@@ -273,6 +286,9 @@ export const getWeeklyStats = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch weekly stats" });
   }
 };
+
+
+
 
 export const getMonthlyTrends = async (req, res) => {
   try {
@@ -301,6 +317,9 @@ export const getMonthlyTrends = async (req, res) => {
         averageHeartRate: true,
       },
     });
+
+
+
 
     const monthlyMap = new Map();
     activities.forEach((activity) => {
@@ -333,6 +352,9 @@ export const getMonthlyTrends = async (req, res) => {
       }
     });
 
+
+
+
     const monthlyTrends = Array.from(monthlyMap.values())
       .map((stats) => ({
         month: stats.month,
@@ -360,6 +382,8 @@ export const getMonthlyTrends = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch monthly trends" });
   }
 };
+
+
 
 export const getIntensityDistribution = async (req, res) => {
   try {
