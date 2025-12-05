@@ -9,6 +9,7 @@ import DashboardPage from "./pages/DashboardPage";
 import AccountPage from "./pages/AccountPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import DataPage from "./pages/DataPage";
+import BestEffortsPage from "./pages/BestEffortsPage";
 import TrainingPlanPage from "./pages/TrainingPlanPage";
 import ComparePage from "./pages/ComparePage";
 
@@ -52,6 +53,7 @@ function App() {
           <Route path="/account" element={<AccountPage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />
           <Route path="/data" element={<DataPage />} />
+          <Route path="/best-efforts" element={<BestEffortsPage />} />
           <Route path="/training-plan" element={<TrainingPlanPage />} />
           <Route path="/compare" element={<ComparePage />} />
         </Routes>

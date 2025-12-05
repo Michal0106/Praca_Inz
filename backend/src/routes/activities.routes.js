@@ -6,6 +6,7 @@ import {
   getActivityById,
   getActivityTypes,
   recalculatePaceData,
+  syncBestEfforts,
 } from "../controllers/activities.controller.js";
 
 const router = express.Router();
@@ -15,5 +16,6 @@ router.get("/types", authenticate, getActivityTypes);
 router.get("/:id", authenticate, getActivityById);
 router.post("/sync", authenticate, syncActivities);
 router.post("/recalculate-pace", authenticate, recalculatePaceData);
+router.post("/sync-best-efforts", authenticate, syncBestEfforts);
 
 export default router;

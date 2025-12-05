@@ -113,9 +113,26 @@ if (params.get("auth") === "success") {
 
     setSyncing(true);
     try {
-      await activitiesAPI.syncActivities();
+      // Najpierw synchronizuj nowe aktywności
+      const response = await activitiesAPI.syncActivities();
+      
+      // Potem synchronizuj szczegóły (best efforts i laps) dla ostatnich 200
+      const detailsResponse = await activitiesAPI.syncBestEfforts();
+      
       await fetchUserData();
-      alert("Dane zsynchronizowane pomyślnie!");
+      
+      let message = "Dane zsynchronizowane pomyślnie!";
+      if (response.data.newActivitiesCount > 0) {
+        message += `\n\nNowe aktywności: ${response.data.newActivitiesCount}`;
+      }
+      if (detailsResponse.data.updated > 0) {
+        message += `\nZaktualizowano szczegóły: ${detailsResponse.data.updated} aktywności`;
+      }
+      if (detailsResponse.data.lapsUpdated > 0) {
+        message += `\nZ odcinkami (laps): ${detailsResponse.data.lapsUpdated}`;
+      }
+      
+      alert(message);
     } catch (error) {
       console.error("Sync error:", error);
       if (error.response?.data?.requiresStravaLink) {
@@ -183,6 +200,7 @@ if (params.get("auth") === "success") {
               className="sync-btn"
               onClick={handleSync}
               disabled={syncing}
+              title="Synchronizuj aktywności, Best Efforts i Laps"
             >
               <RefreshCw size={20} className={syncing ? "spinning" : ""} />
               {syncing ? "Synchronizacja..." : "Synchronizuj dane"}

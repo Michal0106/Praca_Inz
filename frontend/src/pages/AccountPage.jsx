@@ -71,7 +71,7 @@ function AccountPage() {
     const accessToken = localStorage.getItem("accessToken");
 
     const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3001/api";
-    window.location.href = `${apiUrl}/auth/strava?token=${encodeURIComponent(accessToken)}`;
+    window.location.href = `${apiUrl}/auth/strava?mode=connect&token=${encodeURIComponent(accessToken)}`;
   };
 
   const handleFirstSync = async () => {

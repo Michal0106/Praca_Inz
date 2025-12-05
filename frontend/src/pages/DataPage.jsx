@@ -18,7 +18,7 @@ function DataPage() {
   const [showModal, setShowModal] = useState(false);
 
   const navigate = useNavigate();
-  const { activityType, dateRange, metric } = useFilters();
+  const { activityType, dateRange } = useFilters();
 
   useEffect(() => {
     fetchData();
@@ -29,7 +29,7 @@ function DataPage() {
       fetchActivitiesWithFilters();
       fetchFilteredData();
     }
-  }, [activityType, dateRange?.start, dateRange?.end, metric, loading]);
+  }, [activityType, dateRange?.start, dateRange?.end, loading]);
 
   const fetchActivitiesWithFilters = async () => {
     try {
@@ -105,7 +105,7 @@ function DataPage() {
       }
 
       const [longestRes, hardestRes, activitiesRes] = await Promise.all([
-        dataAPI.getLongestActivity(metric, params),
+        dataAPI.getLongestActivity('distance', params),
         dataAPI.getHardestActivity(params),
         activitiesAPI.getActivities(params),
       ]);
@@ -162,20 +162,11 @@ function DataPage() {
             <div className="highlight-icon">
               <Award size={40} />
             </div>
-            <h3>
-              {metric === "distance" && "Najdłuższy dystans"}
-              {metric === "duration" && "Najdłuższy czas"}
-              {metric === "elevationGain" && "Największe przewyższenie"}
-            </h3>
+            <h3>Najdłuższy dystans</h3>
             {longestActivity ? (
               <>
                 <p className="highlight-value">
-                  {metric === "distance" &&
-                    `${(longestActivity.distance / 1000).toFixed(2)} km`}
-                  {metric === "duration" &&
-                    formatDuration(longestActivity.duration)}
-                  {metric === "elevationGain" &&
-                    `${longestActivity.elevationGain} m`}
+                  {(longestActivity.distance / 1000).toFixed(2)} km
                 </p>
                 <p className="highlight-detail">{longestActivity.name}</p>
                 <p className="highlight-date">

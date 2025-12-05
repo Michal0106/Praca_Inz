@@ -165,6 +165,72 @@ export const getActivityRecords = async (req, res) => {
   }
 };
 
+export const getBestEfforts = async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    const { type, startDate, endDate } = req.query;
+
+    const where = {
+      userId,
+      bestEfforts: { not: Prisma.DbNull },
+    };
+
+    if (type && type !== "all") {
+      where.type = type;
+    }
+
+    if (startDate || endDate) {
+      where.startDate = {};
+      if (startDate) {
+        where.startDate.gte = new Date(startDate);
+      }
+      if (endDate) {
+        where.startDate.lte = new Date(endDate);
+      }
+    }
+
+    const activities = await prisma.activity.findMany({
+      where,
+      select: {
+        id: true,
+        name: true,
+        type: true,
+        startDate: true,
+        bestEfforts: true,
+        distance: true,
+      },
+      orderBy: { startDate: "desc" },
+    });
+
+    // Aggregate best efforts by distance
+    const effortsByDistance = {};
+    
+    activities.forEach(activity => {
+      if (activity.bestEfforts && Array.isArray(activity.bestEfforts)) {
+        activity.bestEfforts.forEach(effort => {
+          const key = effort.name;
+          if (!effortsByDistance[key] || effort.elapsed_time < effortsByDistance[key].elapsed_time) {
+            effortsByDistance[key] = {
+              ...effort,
+              activityId: activity.id,
+              activityName: activity.name,
+              activityDate: activity.startDate,
+            };
+          }
+        });
+      }
+    });
+
+    res.json({
+      bestEfforts: Object.values(effortsByDistance),
+      totalActivities: activities.length,
+    });
+  } catch (error) {
+    console.error("Get best efforts error:", error);
+    res.status(500).json({ error: "Failed to fetch best efforts" });
+  }
+};
+
 export const getAverageMetrics = async (req, res) => {
   try {
     const userId = getUserId(req);

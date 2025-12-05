@@ -187,10 +187,22 @@ export const getCurrentUser = async (req, res) => {
 
 export const stravaAuth = (req, res) => {
   const mode = req.query.mode === "connect" ? "connect" : "login";
+  const tokenFromQuery = req.query.token;
 
   let userId = null;
 
-  if (mode === "connect" && req.user?.userId) {
+  // Jeśli token jest w query, weryfikuj go
+  if (tokenFromQuery) {
+    try {
+      const decoded = jwtService.verifyAccessToken(tokenFromQuery);
+      userId = decoded.userId;
+    } catch (error) {
+      console.error("Invalid token in query:", error);
+    }
+  }
+  
+  // Fallback do req.user (z middleware)
+  if (!userId && mode === "connect" && req.user?.userId) {
     userId = req.user.userId;
   }
 
@@ -236,6 +248,17 @@ export const stravaCallback = async (req, res) => {
       if (!userId) {
         return res.redirect(
           `${process.env.CLIENT_URL}/account?error=not_logged_in`
+        );
+      }
+
+      // Check if this Strava account is already connected to another user
+      const existingStravaUser = await prisma.user.findUnique({
+        where: { stravaId },
+      });
+
+      if (existingStravaUser && existingStravaUser.id !== userId) {
+        return res.redirect(
+          `${process.env.CLIENT_URL}/account?error=strava_already_linked`
         );
       }
 

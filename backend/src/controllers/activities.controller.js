@@ -1,4 +1,5 @@
 import prisma from "../config/database.js";
+import { Prisma } from "@prisma/client";
 import { stravaService } from "../services/strava.service.js";
 import polyline from "@mapbox/polyline";
 import { getUserId, getStravaToken } from "../utils/auth.utils.js";
@@ -78,6 +79,7 @@ export const syncActivities = async (req, res) => {
 
     let newActivities = [];
     let updatedActivities = 0;
+    let bestEffortsUpdated = 0;
 
     if (source === "STRAVA") {
       console.log(`Starting incremental sync for user ${userId}...`);
@@ -178,6 +180,8 @@ export const syncActivities = async (req, res) => {
               averagePower: activity.average_watts,
               maxPower: activity.max_watts,
               trainingLoad: activity.suffer_score,
+              bestEfforts: detailedActivity.best_efforts || null,
+              laps: detailedActivity.laps || null,
             },
           });
 
@@ -265,12 +269,67 @@ export const syncActivities = async (req, res) => {
       console.log(
         `Sync complete: ${newActivities.length} new, ${updatedActivities} existing`,
       );
+      
+      // Sync best efforts and laps for recent activities without them
+      console.log('Checking for activities without best efforts or laps...');
+      const activitiesNeedingSync = await prisma.activity.findMany({
+        where: {
+          userId,
+          source: "STRAVA",
+          OR: [
+            { bestEfforts: { equals: Prisma.JsonNull } },
+            { laps: { equals: Prisma.JsonNull } },
+          ],
+        },
+        orderBy: { startDate: "desc" },
+        take: 50,
+      });
+      
+      if (activitiesNeedingSync.length > 0) {
+        console.log(`Found ${activitiesNeedingSync.length} activities needing sync. Updating...`);
+        
+        for (const activity of activitiesNeedingSync) {
+          try {
+            await new Promise(resolve => setTimeout(resolve, 300));
+            
+            const detailedActivity = await stravaService.getActivity(
+              accessToken,
+              activity.externalId,
+            );
+
+            const updateData = {};
+            if (detailedActivity.best_efforts && detailedActivity.best_efforts.length > 0) {
+              updateData.bestEfforts = detailedActivity.best_efforts;
+              bestEffortsUpdated++;
+            }
+            if (detailedActivity.laps && detailedActivity.laps.length > 0) {
+              updateData.laps = detailedActivity.laps;
+            }
+            
+            if (Object.keys(updateData).length > 0) {
+              await prisma.activity.update({
+                where: { id: activity.id },
+                data: updateData,
+              });
+            }
+          } catch (error) {
+            if (error.response?.status === 429) {
+              console.log(`⚠️  Rate limit hit during best efforts sync.`);
+              break;
+            }
+            console.error(`Error syncing best efforts for ${activity.name}:`, error.message);
+          }
+        }
+        
+        console.log(`Best efforts updated for ${bestEffortsUpdated} activities`);
+      }
     }
 
     res.json({
       message: "Activities synced successfully",
       newActivitiesCount: newActivities.length,
       existingActivitiesCount: updatedActivities,
+      bestEffortsUpdated: bestEffortsUpdated,
       activities: newActivities,
     });
   } catch (error) {
@@ -401,6 +460,101 @@ export const recalculatePaceData = async (req, res) => {
     console.error("Recalculate pace data error:", error);
     res.status(500).json({
       error: "Failed to recalculate pace data",
+      details: error.message,
+    });
+  }
+};
+
+export const syncBestEfforts = async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    const accessToken = await getStravaToken(req);
+
+    if (!accessToken) {
+      return res.status(401).json({
+        error: "Not authenticated with Strava",
+        requiresStravaLink: true,
+      });
+    }
+
+    console.log(`Syncing best efforts for user ${userId}...`);
+
+    const activities = await prisma.activity.findMany({
+      where: {
+        userId,
+        source: "STRAVA",
+      },
+      orderBy: { startDate: "desc" },
+      take: 200,
+    });
+
+    console.log(`Found ${activities.length} activities to update`);
+
+    let updated = 0;
+    let skipped = 0;
+    let errors = 0;
+    let lapsUpdated = 0;
+
+    for (const activity of activities) {
+      try {
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        const detailedActivity = await stravaService.getActivity(
+          accessToken,
+          activity.externalId,
+        );
+
+        const updateData = {};
+        let hasUpdate = false;
+        
+        if (detailedActivity.best_efforts && detailedActivity.best_efforts.length > 0) {
+          updateData.bestEfforts = detailedActivity.best_efforts;
+          hasUpdate = true;
+        }
+        
+        if (detailedActivity.laps && detailedActivity.laps.length > 0) {
+          updateData.laps = detailedActivity.laps;
+          lapsUpdated++;
+          hasUpdate = true;
+        }
+        
+        if (hasUpdate) {
+          await prisma.activity.update({
+            where: { id: activity.id },
+            data: updateData,
+          });
+          updated++;
+          console.log(`✓ Updated ${activity.name} (BE: ${!!updateData.bestEfforts}, Laps: ${!!updateData.laps})`);
+        } else {
+          skipped++;
+        }
+
+        if (updated % 10 === 0 && updated > 0) {
+          console.log(`Progress: ${updated} updated, ${skipped} skipped, ${lapsUpdated} with laps`);
+        }
+      } catch (error) {
+        errors++;
+        console.error(`Error updating ${activity.name}:`, error.message);
+        
+        if (error.response?.status === 429) {
+          console.log(`⚠️  Rate limit hit. Updated ${updated} activities.`);
+          break;
+        }
+      }
+    }
+
+    res.json({
+      message: "Best efforts and laps sync completed",
+      updated,
+      skipped,
+      lapsUpdated,
+      total: activities.length,
+      errors,
+    });
+  } catch (error) {
+    console.error("Sync best efforts error:", error);
+    res.status(500).json({
+      error: "Failed to sync best efforts",
       details: error.message,
     });
   }

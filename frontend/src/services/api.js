@@ -126,6 +126,7 @@ export const activitiesAPI = {
   getActivityTypes: () => api.get("/activities/types"),
   syncActivities: () => api.post("/activities/sync"),
   recalculatePaceData: () => api.post("/activities/recalculate-pace"),
+  syncBestEfforts: () => api.post("/activities/sync-best-efforts"),
 };
 
 export const analyticsAPI = {
@@ -148,6 +149,7 @@ export const dataAPI = {
     api.get("/data/hardest-activity", { params }),
   getRecords: () => api.get("/data/records"),
   getAverages: (groupBy) => api.get("/data/averages", { params: { groupBy } }),
+  getBestEfforts: (params) => api.get("/data/best-efforts", { params }),
 };
 
 export const trainingPlanAPI = {

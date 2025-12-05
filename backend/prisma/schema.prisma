@@ -63,6 +63,8 @@ model Activity {
   normalizedPower  Int?
   pacePerKm        Json?            @db.Json
   tss              Float?
+  bestEfforts      Json?            @db.Json
+  laps             Json?            @db.Json
   user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   cluster          ActivityCluster?
   gpsPoints        GpsPoint[]
