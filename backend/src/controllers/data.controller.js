@@ -41,7 +41,6 @@ export const getLongestActivity = async (req, res) => {
       return res.status(400).json({ error: "Invalid metric" });
     }
 
-    // Build WHERE conditions for Prisma
     const where = {
       userId,
       [metric]: {
@@ -85,7 +84,6 @@ export const getHardestActivity = async (req, res) => {
     const userId = getUserId(req);
     const { type, startDate, endDate } = req.query;
 
-    // Build WHERE conditions with parameterized values
     let query = `
       SELECT *,
         (COALESCE("trainingLoad", 0) * 0.4 + 
@@ -202,7 +200,6 @@ export const getBestEfforts = async (req, res) => {
       orderBy: { startDate: "desc" },
     });
 
-    // Aggregate best efforts by distance
     const effortsByDistance = {};
     
     activities.forEach(activity => {

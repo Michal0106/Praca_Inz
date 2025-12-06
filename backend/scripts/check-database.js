@@ -58,7 +58,6 @@ async function checkDatabase() {
         console.log(`  - ${source}: ${_count}`);
       });
 
-      // Ostatnie 5 aktywności
       const recentActivities = await prisma.activity.findMany({
         take: 5,
         orderBy: { startDate: 'desc' },
@@ -94,26 +93,21 @@ async function checkDatabase() {
       });
     }
 
-    // Sprawdzenie metryk fitness
     const fitnessMetrics = await prisma.fitnessMetrics.count();
     console.log(`\n💪 Metryki fitness: ${fitnessMetrics}`);
 
-    // Sprawdzenie osiągnięć
     const achievements = await prisma.achievement.count();
     const earnedAchievements = await prisma.achievement.count({
       where: { earned: true }
     });
     console.log(`\n🏆 Osiągnięcia: ${earnedAchievements}/${achievements} zdobytych`);
 
-    // Sprawdzenie punktów GPS
     const gpsPoints = await prisma.gpsPoint.count();
     console.log(`\n📍 Punkty GPS: ${gpsPoints}`);
 
-    // Sprawdzenie Power Curve
     const powerCurves = await prisma.powerCurve.count();
     console.log(`\n⚡ Power Curves: ${powerCurves}`);
 
-    // Sprawdzenie Activity Clusters
     const clusters = await prisma.activityCluster.count();
     console.log(`\n🔍 Activity Clusters: ${clusters}`);
 

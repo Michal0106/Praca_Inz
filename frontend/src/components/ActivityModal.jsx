@@ -46,10 +46,8 @@ function ActivityModal({ activity, onClose }) {
   const hasBestEfforts = activity.bestEfforts && Array.isArray(activity.bestEfforts) && activity.bestEfforts.length > 0;
   const hasLaps = activity.laps && Array.isArray(activity.laps) && activity.laps.length > 0;
 
-  // Calculate pace values for chart (faster pace = higher bar)
   const getPaceValue = (lap) => {
     if (!lap.distance || lap.distance === 0) return 0;
-    // Seconds per km - lower is faster, but we want faster = higher bar
     const paceSecondsPerKm = (lap.elapsed_time / lap.distance) * 1000;
     return paceSecondsPerKm;
   };
@@ -211,16 +209,13 @@ function ActivityModal({ activity, onClose }) {
                 {activity.laps.map((lap, index) => {
                   const paceSecondsPerKm = getPaceValue(lap);
                   
-                  // Calculate height as percentage relative to container
                   let heightPercent = 50;
                   const paceRange = maxPaceValue - minPaceValue;
                   if (paceRange > 0) {
                     const normalized = (maxPaceValue - paceSecondsPerKm) / paceRange;
-                    // Scale from 15% (slowest) to 95% (fastest)
-                    heightPercent = 15 + normalized * 80;
+                    heightPercent =  normalized * 80;
                   }
                   
-                  // Width: proportional to lap distance relative to total distance
                   const totalDistance = activity.laps.reduce((sum, l) => sum + l.distance, 0);
                   const widthPercent = totalDistance > 0 ? (lap.distance / totalDistance) * 100 : 100 / activity.laps.length;
                   
