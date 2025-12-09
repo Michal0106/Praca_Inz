@@ -80,7 +80,7 @@ function AccountPage() {
       console.log("Auto-sync po połączeniu ze Stravą...");
       const response = await activitiesAPI.syncActivities();
       console.log("Sync response:", response.data);
-      await fetchUserData(); // Odśwież dane użytkownika
+      await fetchUserData(); 
       alert(
         `Zsynchronizowano aktywności ze Stravą!\n\nNowe aktywności: ${response.data.newActivitiesCount}`,
       );

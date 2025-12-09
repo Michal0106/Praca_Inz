@@ -208,7 +208,7 @@ function ActivityModal({ activity, onClose }) {
                 {activity.laps.map((lap, index) => {
                   const paceSecondsPerKm = getPaceValue(lap);
                   
-                  let heightPercent = 50;
+                  let heightPercent = 100;
                   const paceRange = maxPaceValue - minPaceValue;
                   if (paceRange > 0) {
                     const normalized = (maxPaceValue - paceSecondsPerKm) / paceRange;

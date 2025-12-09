@@ -13,10 +13,6 @@ function HomePage() {
     navigate("/register");
   };
 
-  const handleStravaAuth = () => {
-    window.location.href = "http://localhost:3001/api/auth/strava";
-  };
-
   return (
     <div className="home-page">
       <div className="hero-section">
@@ -37,12 +33,6 @@ function HomePage() {
 
             <button className="auth-btn secondary-btn" onClick={handleRegister}>
               Zarejestruj się
-            </button>
-
-            <div className="divider-text">lub</div>
-
-            <button className="auth-btn strava-btn" onClick={handleStravaAuth}>
-              Kontynuuj ze Strava
             </button>
           </div>
         </div>

@@ -84,19 +84,6 @@ function LoginPage() {
           <div className="auth-links">
             <Link to="/register">Nie masz konta? Zarejestruj się</Link>
           </div>
-
-          <div className="divider">
-            <span>lub</span>
-          </div>
-
-          <button
-            className="auth-btn strava"
-            onClick={() =>
-              (window.location.href = "http://localhost:3001/api/auth/strava")
-            }
-          >
-            <span></span> Zaloguj przez Stravę
-          </button>
         </div>
       </div>
     </div>

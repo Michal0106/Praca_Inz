@@ -113,10 +113,8 @@ if (params.get("auth") === "success") {
 
     setSyncing(true);
     try {
-      // Najpierw synchronizuj nowe aktywności
       const response = await activitiesAPI.syncActivities();
       
-      // Potem synchronizuj szczegóły (best efforts i laps) dla ostatnich 200
       const detailsResponse = await activitiesAPI.syncBestEfforts();
       
       await fetchUserData();
@@ -135,9 +133,29 @@ if (params.get("auth") === "success") {
       alert(message);
     } catch (error) {
       console.error("Sync error:", error);
-      if (error.response?.status === 401 || error.response?.data?.requiresStravaLink) {
-        // Token wygasł lub wymaga ponownej autoryzacji
-        await fetchUserData(); // Odśwież dane użytkownika, aby zaktualizować status połączenia
+      
+      if (error.response?.status === 429) {
+        const resetDate = error.response.data?.rateLimitReset;
+        let message = "Osiągnięto limit zapytań do Strava API.\n\n";
+        
+        if (resetDate) {
+          const resetTime = new Date(resetDate);
+          const now = new Date();
+          const minutesUntilReset = Math.ceil((resetTime - now) / 60000);
+          
+          if (minutesUntilReset > 0) {
+            message += `Limit zostanie zresetowany za około ${minutesUntilReset} minut.\n\n`;
+          }
+        }
+        
+        message += "Strava API pozwala na:\n" +
+                   "• 100 zapytań na 15 minut\n" +
+                   "• 1000 zapytań dziennie\n\n" +
+                   "Spróbuj ponownie później.";
+        
+        alert(message);
+      } else if (error.response?.status === 401 || error.response?.data?.requiresStravaLink) {
+        await fetchUserData();
         
         const confirmLink = confirm(
           "Twoje połączenie ze Stravą wygasło i wymaga ponownej autoryzacji.\n\n" +

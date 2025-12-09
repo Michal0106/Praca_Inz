@@ -180,7 +180,6 @@ export const getCurrentUser = async (req, res) => {
         isStravaEmail: isStravaEmail,
         firstName: user.firstName,
         lastName: user.lastName,
-        isEmailVerified: user.isEmailVerified,
         hasStravaData: isStravaConnected,
         hasGarminData: !!user.garminId,
         stats: user.userStats,
@@ -240,104 +239,50 @@ export const stravaCallback = async (req, res) => {
     const stateData = JSON.parse(state);
     const mode = stateData.mode || "login";
 
-
-    const stravaId = athlete.id.toString();
-    const emailSafe = athlete.email || `strava_${stravaId}@strava.local`;
-
-
-
-    if (mode === "connect") {
-      const userId = stateData.userId;
-
-      if (!userId) {
-        return res.redirect(
-          `${process.env.CLIENT_URL}/account?error=not_logged_in`
-        );
-      }
-
-      const existingStravaUser = await prisma.user.findUnique({
-        where: { stravaId },
-      });
-
-      if (existingStravaUser && existingStravaUser.id !== userId) {
-        return res.redirect(
-          `${process.env.CLIENT_URL}/account?error=strava_already_linked`
-        );
-      }
-
-      await prisma.user.update({
-        where: { id: userId },
-        data: {
-          stravaId,
-          stravaAccessToken: access_token,
-          stravaRefreshToken: refresh_token,
-          stravaTokenExpiresAt: new Date(expires_at * 1000),
-        },
-      });
-
-      try {
-        console.log(`Starting automatic sync for user ${userId} after Strava connection...`);
-        await syncStravaActivities(userId, access_token);
-        console.log(`Automatic sync completed for user ${userId}`);
-      } catch (syncError) {
-        console.error('Auto-sync error:', syncError);
-      }
-
-      return res.redirect(`${process.env.CLIENT_URL}/account?strava=linked`);
+    if (mode !== "connect") {
+      return res.redirect(
+        `${process.env.CLIENT_URL}/login?error=strava_login_disabled`
+      );
     }
 
+    const stravaId = athlete.id.toString();
+    const userId = stateData.userId;
 
+    if (!userId) {
+      return res.redirect(
+        `${process.env.CLIENT_URL}/login?error=must_login_first`
+      );
+    }
 
-    let user = await prisma.user.findUnique({
+    const existingStravaUser = await prisma.user.findUnique({
       where: { stravaId },
     });
 
-    if (!user) {
-      user = await prisma.user.create({
-        data: {
-          email: emailSafe,
-          password: "STRAVA_OAUTH",
-          stravaId,
-          firstName: athlete.firstname || null,
-          lastName: athlete.lastname || null,
-          isEmailVerified: true,
-          stravaAccessToken: access_token,
-          stravaRefreshToken: refresh_token,
-          stravaTokenExpiresAt: new Date(expires_at * 1000),
-          userStats: { create: {} },
-        },
-      });
-      
-      try {
-        console.log(`Starting automatic sync for new user ${user.id}...`);
-        await syncStravaActivities(user.id, access_token);
-        console.log(`Automatic sync completed for new user ${user.id}`);
-      } catch (syncError) {
-        console.error('Auto-sync error for new user:', syncError);
-      }
-    } else {
-      await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          firstName: user.firstName || athlete.firstname || null,
-          lastName: user.lastName || athlete.lastname || null,
-          stravaAccessToken: access_token,
-          stravaRefreshToken: refresh_token,
-          stravaTokenExpiresAt: new Date(expires_at * 1000),
-        },
-      });
+    if (existingStravaUser && existingStravaUser.id !== userId) {
+      return res.redirect(
+        `${process.env.CLIENT_URL}/account?error=strava_already_linked`
+      );
     }
 
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        stravaId,
+        stravaAccessToken: access_token,
+        stravaRefreshToken: refresh_token,
+        stravaTokenExpiresAt: new Date(expires_at * 1000),
+      },
+    });
 
+    try {
+      console.log(`Starting automatic sync for user ${userId} after Strava connection...`);
+      await syncStravaActivities(userId, access_token);
+      console.log(`Automatic sync completed for user ${userId}`);
+    } catch (syncError) {
+      console.error('Auto-sync error:', syncError);
+    }
 
-    req.session = null;
-
-    const jwtAccess = jwtService.generateAccessToken(user.id);
-    const jwtRefresh = await jwtService.generateRefreshToken(user.id);
-
-    return res.redirect(
-      `${process.env.CLIENT_URL}/dashboard?auth=success&access=${jwtAccess}&refresh=${jwtRefresh}`
-    );
+    return res.redirect(`${process.env.CLIENT_URL}/account?strava=linked`);
 
   } catch (err) {
     console.error("Strava callback error:", err);
@@ -414,31 +359,96 @@ async function syncStravaActivities(userId, accessToken) {
       });
 
       if (!existing) {
-        await prisma.activity.create({
-          data: {
-            userId,
-            externalId: activity.id.toString(),
-            source: "STRAVA",
-            name: activity.name,
-            type: activity.type,
-            startDate: new Date(activity.start_date),
-            duration: activity.moving_time,
-            distance: activity.distance,
-            averageHeartRate: activity.average_heartrate,
-            maxHeartRate: activity.max_heartrate,
-            averageSpeed: activity.average_speed,
-            maxSpeed: activity.max_speed,
-            elevationGain: activity.total_elevation_gain,
-            calories: activity.calories,
-            averagePower: activity.average_watts,
-            maxPower: activity.max_watts,
-            trainingLoad: activity.suffer_score,
-          },
-        });
-        newCount++;
+        console.log(`Fetching details for activity ${activity.id}...`);
         
-        if (newCount % 50 === 0) {
-          console.log(`Saved ${newCount} activities...`);
+        try {
+          await new Promise(resolve => setTimeout(resolve, 250));
+          
+          const detailedActivity = await stravaService.getActivity(
+            accessToken,
+            activity.id,
+          );
+
+          await prisma.activity.create({
+            data: {
+              userId,
+              externalId: activity.id.toString(),
+              source: "STRAVA",
+              name: activity.name,
+              type: activity.type,
+              startDate: new Date(activity.start_date),
+              duration: activity.moving_time,
+              distance: activity.distance,
+              averageHeartRate: activity.average_heartrate,
+              maxHeartRate: activity.max_heartrate,
+              averageSpeed: activity.average_speed,
+              maxSpeed: activity.max_speed,
+              elevationGain: activity.total_elevation_gain,
+              calories: activity.calories,
+              averagePower: activity.average_watts,
+              maxPower: activity.max_watts,
+              trainingLoad: activity.suffer_score,
+              bestEfforts: detailedActivity.best_efforts || null,
+              laps: detailedActivity.laps || null,
+            },
+          });
+          newCount++;
+          
+          if (newCount % 50 === 0) {
+            console.log(`Saved ${newCount} activities...`);
+          }
+        } catch (detailError) {
+          if (detailError.response?.status === 429) {
+            console.log(`⚠️  Rate limit hit. Saving basic activity data without details.`);
+            await prisma.activity.create({
+              data: {
+                userId,
+                externalId: activity.id.toString(),
+                source: "STRAVA",
+                name: activity.name,
+                type: activity.type,
+                startDate: new Date(activity.start_date),
+                duration: activity.moving_time,
+                distance: activity.distance,
+                averageHeartRate: activity.average_heartrate,
+                maxHeartRate: activity.max_heartrate,
+                averageSpeed: activity.average_speed,
+                maxSpeed: activity.max_speed,
+                elevationGain: activity.total_elevation_gain,
+                calories: activity.calories,
+                averagePower: activity.average_watts,
+                maxPower: activity.max_watts,
+                trainingLoad: activity.suffer_score,
+              },
+            });
+            newCount++;
+            console.log(`⏸  Pausing sync due to rate limit. ${newCount} activities saved.`);
+            break;
+          } else {
+            console.error(`Error fetching details for ${activity.id}:`, detailError.message);
+            await prisma.activity.create({
+              data: {
+                userId,
+                externalId: activity.id.toString(),
+                source: "STRAVA",
+                name: activity.name,
+                type: activity.type,
+                startDate: new Date(activity.start_date),
+                duration: activity.moving_time,
+                distance: activity.distance,
+                averageHeartRate: activity.average_heartrate,
+                maxHeartRate: activity.max_heartrate,
+                averageSpeed: activity.average_speed,
+                maxSpeed: activity.max_speed,
+                elevationGain: activity.total_elevation_gain,
+                calories: activity.calories,
+                averagePower: activity.average_watts,
+                maxPower: activity.max_watts,
+                trainingLoad: activity.suffer_score,
+              },
+            });
+            newCount++;
+          }
         }
       } else {
         existingCount++;

@@ -58,6 +58,11 @@ export const isAuthenticated = (req, res, next) => {
 
 export const authenticate = async (req, res, next) => {
   const authHeader = req.headers.authorization;
+  console.log('[Auth] Headers:', {
+    authorization: authHeader ? `${authHeader.substring(0, 20)}...` : 'MISSING',
+    path: req.path,
+  });
+  
   if (authHeader && authHeader.startsWith("Bearer")) {
     try {
       const token = authHeader.substring(7);
@@ -67,8 +72,12 @@ export const authenticate = async (req, res, next) => {
         userId: decoded.userId,
         id: decoded.userId,
       };
+      console.log('[Auth] JWT success, userId:', decoded.userId);
       return next();
-    } catch (error) {}
+    } catch (error) {
+      console.error('[Auth] JWT verification failed:', error.message);
+      return res.status(401).json({ error: "Invalid or expired token" });
+    }
   }
 
   if (req.session && req.session.userId) {
@@ -76,17 +85,10 @@ export const authenticate = async (req, res, next) => {
       userId: req.session.userId,
       id: req.session.userId,
     };
+    console.log('[Auth] Session success, userId:', req.session.userId);
     return next();
   }
 
-  if (process.env.NODE_ENV !== "production") {
-    console.log("Dev mode: Using mock user");
-    req.user = {
-      userId: "486a47c8-a58c-46fb-912e-602c9b5674f1",
-      id: "486a47c8-a58c-46fb-912e-602c9b5674f1",
-    };
-    return next();
-  }
-
+  console.error('[Auth] No valid authentication found');
   return res.status(401).json({ error: "Unauthorized" });
 };

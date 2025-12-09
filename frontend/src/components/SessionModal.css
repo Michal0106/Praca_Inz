@@ -60,7 +60,7 @@
 .interval-details h3,
 .heart-rate-zone h3,
 .session-notes h3 {
-  margin: 0 0 12px 0;
+  margin: 0 0 16px 0;
   font-size: 16px;
   color: #374151;
   font-weight: 600;
@@ -72,6 +72,92 @@
   line-height: 1.6;
 }
 
+/* Nowa wizualizacja interwałów */
+.interval-sequence {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.interval-phase {
+  display: flex;
+  gap: 16px;
+  padding: 16px;
+  border-radius: 12px;
+  background: #f9fafb;
+  border-left: 4px solid;
+  transition: all 0.2s ease;
+}
+
+.interval-phase:hover {
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.interval-phase.warmup {
+  border-left-color: #f59e0b;
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+}
+
+.interval-phase.main-work {
+  border-left-color: #ef4444;
+  background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+}
+
+.interval-phase.cooldown {
+  border-left-color: #3b82f6;
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+}
+
+.phase-icon {
+  font-size: 32px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.phase-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.phase-label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #6b7280;
+}
+
+.phase-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+  line-height: 1.4;
+}
+
+.phase-recovery {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 6px;
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.recovery-icon {
+  font-size: 16px;
+}
+
+.recovery-text {
+  flex: 1;
+}
+
+/* Stare style interwałów - do usunięcia */
 .interval-info {
   display: flex;
   flex-direction: column;

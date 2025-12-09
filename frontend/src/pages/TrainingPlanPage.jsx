@@ -369,16 +369,18 @@ function TrainingPlanPage() {
                         </div>
                         <div className="session-content">
                           <div className="session-title">
-                            {session.sessionType?.replace("_", "") || "Trening"}
+                            {session.name || session.sessionType?.replace("_", " ") || "Trening"}
                           </div>
                           <div className="session-meta">
                             <span>
-                              <Clock size={14} /> {session.duration} min
+                              <Clock size={14} /> {session.targetDuration || session.duration || 0} min
                             </span>
-                            {session.distance && (
+                            {(session.targetDistance || session.distance) && (
                               <span>
                                 <Target size={14} />{" "}
-                                {(session.distance / 1000).toFixed(1)} km
+                                {session.targetDistance 
+                                  ? session.targetDistance.toFixed(1) 
+                                  : (session.distance / 1000).toFixed(1)} km
                               </span>
                             )}
                             <span

@@ -47,7 +47,6 @@ api.interceptors.request.use(
         localStorage.removeItem("accessToken");
         localStorage.removeItem("refreshToken");
         localStorage.removeItem("user");
-        window.location.href = "/login";
         return Promise.reject(error);
       }
     }
@@ -77,7 +76,6 @@ api.interceptors.response.use(
         localStorage.removeItem("accessToken");
         localStorage.removeItem("refreshToken");
         localStorage.removeItem("user");
-        window.location.href = "/login";
         return Promise.reject(refreshError);
       }
     }
@@ -157,6 +155,73 @@ export const trainingPlanAPI = {
   getTemplates: (params) => api.get("/training-plan/templates", { params }),
   getPlanById: (id) => api.get(`/training-plan/${id}`),
   getSessionById: (id) => api.get(`/training-plan/session/${id}`),
+  
+  analyzeTraining: () => api.get("/training-plan/analyze"),
+  generatePlan: (data) => api.post("/training-plan/generate", data),
+  generatePlanSSE: (data, onProgress) => {
+    const token = localStorage.getItem('accessToken');
+    const url = `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/training-plan/generate-sse`;
+    
+    return new Promise((resolve, reject) => {
+      fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(data),
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Failed to start plan generation: ${response.status} ${response.statusText}`);
+        }
+        
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        
+        const readStream = () => {
+          reader.read().then(({ done, value }) => {
+            if (done) {
+              return;
+            }
+            
+            const text = decoder.decode(value);
+            const lines = text.split('\n');
+            
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                const data = JSON.parse(line.substring(6));
+                
+                if (data.error) {
+                  reject(new Error(data.error));
+                  return;
+                }
+                
+                if (data.complete) {
+                  resolve(data.plan);
+                  return;
+                }
+                
+                if (data.progress !== undefined && onProgress) {
+                  onProgress(data.progress, data.message);
+                }
+              }
+            }
+            
+            readStream();
+          }).catch(reject);
+        };
+        
+        readStream();
+      })
+      .catch(reject);
+    });
+  },
+  getMyPlans: () => api.get("/training-plan/my-plans"),
+  getMyPlanById: (planId) => api.get(`/training-plan/my-plans/${planId}`),
+  completeWorkout: (workoutId, data) => api.patch(`/training-plan/workout/${workoutId}/complete`, data),
+  updatePlanStatus: (planId, status) => api.patch(`/training-plan/my-plans/${planId}/status`, { status }),
+  deletePlan: (planId) => api.delete(`/training-plan/my-plans/${planId}`),
 };
 
 export default api;

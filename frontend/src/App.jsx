@@ -11,6 +11,9 @@ import AnalyticsPage from "./pages/AnalyticsPage";
 import DataPage from "./pages/DataPage";
 import BestEffortsPage from "./pages/BestEffortsPage";
 import TrainingPlanPage from "./pages/TrainingPlanPage";
+import MyTrainingPlansPage from "./pages/MyTrainingPlansPage";
+import CreateTrainingPlanPage from "./pages/CreateTrainingPlanPage";
+import TrainingPlanDetailPage from "./pages/TrainingPlanDetailPage";
 import ComparePage from "./pages/ComparePage";
 
 function App() {
@@ -55,6 +58,9 @@ function App() {
           <Route path="/data" element={<DataPage />} />
           <Route path="/best-efforts" element={<BestEffortsPage />} />
           <Route path="/training-plan" element={<TrainingPlanPage />} />
+          <Route path="/training-plans" element={<MyTrainingPlansPage />} />
+          <Route path="/training-plans/create" element={<CreateTrainingPlanPage />} />
+          <Route path="/training-plans/:planId" element={<TrainingPlanDetailPage />} />
           <Route path="/compare" element={<ComparePage />} />
         </Routes>
       </FilterProvider>

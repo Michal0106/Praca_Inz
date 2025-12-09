@@ -29,6 +29,7 @@
     "express-session": "^1.17.3",
     "jsonwebtoken": "^9.0.2",
     "nodemailer": "^7.0.10",
+    "openai": "^6.10.0",
     "passport": "^0.7.0",
     "passport-oauth2": "^1.8.0"
   },

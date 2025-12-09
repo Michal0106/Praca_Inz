@@ -74,9 +74,12 @@ Praca_Inz/
 ### Wymagania
 - Node.js (v18+)
 - PostgreSQL (v14+)
+- **Ollama** (lokalny model AI - darmowy, bez API keys!)
 - Konto Strava Developer (✅ Już skonfigurowane! Client ID: 185513)
 
-⚠️ **WAŻNE**: Sprawdź plik `STRAVA_SCOPE_UPDATE.md` aby zaktualizować uprawnienia OAuth!
+⚠️ **WAŻNE**: 
+- Sprawdź plik `STRAVA_SCOPE_UPDATE.md` aby zaktualizować uprawnienia OAuth!
+- Zainstaluj i uruchom Ollama zgodnie z instrukcjami w `backend/OLLAMA_SETUP.md`
 
 ### 1. Sklonuj repozytorium
 
@@ -84,20 +87,46 @@ Praca_Inz/
 cd /Users/michalmroz/Documents/PJATK/Praca_Inz
 ```
 
-### 2. Konfiguracja PostgreSQL
+### 2. Instalacja Ollama (Model AI)
+
+**Aplikacja używa lokalnego modelu AI (Qwen2.5) zamiast OpenAI API - całkowicie za darmo!**
+
+```bash
+# macOS / Linux:
+curl -fsSL https://ollama.com/install.sh | sh
+
+# lub macOS (Homebrew):
+brew install ollama
+
+# Pobierz model (zalecana wersja):
+ollama pull qwen2.5:7b
+
+# Uruchom Ollama w tle:
+ollama serve
+```
+
+**Szczegółowe instrukcje w:** `backend/OLLAMA_SETUP.md`
+
+**Test instalacji:**
+```bash
+cd backend
+node scripts/test-ollama.js
+```
+
+### 3. Konfiguracja PostgreSQL
 
 Utwórz bazę danych:
 ```bash
 createdb training_db
 ```
 
-### 3. Konfiguracja Strava API
+### 4. Konfiguracja Strava API
 
 1. Zarejestruj aplikację na: https://www.strava.com/settings/api
 2. Ustaw Authorization Callback Domain: `localhost`
 3. Zapisz Client ID i Client Secret
 
-### 4. Backend Setup
+### 5. Backend Setup
 
 ```bash
 cd backend
@@ -120,6 +149,9 @@ STRAVA_CLIENT_SECRET=twoj_strava_client_secret
 STRAVA_CALLBACK_URL=http://localhost:5000/api/auth/strava/callback
 
 CLIENT_URL=http://localhost:3000
+
+# Ollama będzie działać lokalnie, nie potrzebujesz klucza API!
+# Upewnij się że Ollama działa: ollama serve
 ```
 
 Wygeneruj Prisma Client i uruchom migracje:
@@ -134,7 +166,13 @@ Uruchom serwer:
 npm run dev
 ```
 
-### 5. Frontend Setup
+**WAŻNE:** Upewnij się, że Ollama działa w tle przed uruchomieniem backendu:
+```bash
+# W osobnym terminalu:
+ollama serve
+```
+
+### 6. Frontend Setup
 
 W nowym terminalu:
 ```bash
@@ -144,6 +182,22 @@ npm run dev
 ```
 
 ## 📱 Funkcjonalności
+
+### ✨ Nowa funkcja: Generowanie planów treningowych AI
+
+**Wykorzystanie lokalnego modelu Qwen2.5 (przez Ollama):**
+- ✅ **Całkowicie darmowe** - brak kosztów API
+- ✅ **Prywatne** - dane nie opuszczają twojego komputera
+- ✅ **Offline** - działa bez internetu (po pobraniu modelu)
+- ✅ **Spersonalizowane** - analizuje twoje dane ze Strava
+- ✅ **Metodyka Jacka Danielsa** - profesjonalne plany treningowe
+
+**Wymagania:**
+- Ollama zainstalowane i uruchomione (`ollama serve`)
+- Model pobrany (`ollama pull qwen2.5:7b`)
+- Co najmniej 8GB RAM (zalecane 16GB dla szybszego działania)
+
+**Zobacz:** `backend/OLLAMA_SETUP.md` dla szczegółów konfiguracji
 
 ### 1. Strona główna
 - Wybór źródła danych (Strava/Garmin)

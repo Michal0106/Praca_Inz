@@ -469,7 +469,6 @@ const PaceConsistencySection = ({ first, second }) => {
 
         {comparison && (
           <>
-            {/*  PODSUMOWANIA */}
             <div className="compare-summary-row">
               <div className="compare-summary-card">
                 <h2>Pierwszy trening</h2>
@@ -492,8 +491,6 @@ const PaceConsistencySection = ({ first, second }) => {
             </div>
 
 
-            {/* WYKRES 1*/}
-            {/* dystans / czas / predkosc */}
             {summaryChartData.length > 0 && (
               <div className="compare-chart-card">
                 <h3>Porównanie obciążeń (dystans / czas / prędkość)</h3>
@@ -522,8 +519,6 @@ const PaceConsistencySection = ({ first, second }) => {
             )}
 
 
-            {/* WYKRES 2*/}
-            {/*  tempo na km  */}
             <div className="compare-chart-card">
               <h3>Tempo na poszczególnych kilometrach</h3>
               {pacePerKmChartData.length > 0 ? (
@@ -565,8 +560,6 @@ const PaceConsistencySection = ({ first, second }) => {
             </div>
 
 
-            {/* WYKRES 3*/}
-            {/*stabilnosc + split */}
             <div className="compare-chart-card">
               <PaceConsistencySection
                 first={comparison.first}
@@ -575,8 +568,6 @@ const PaceConsistencySection = ({ first, second }) => {
             </div>
 
 
-            {/* WYKRES 4*/}
-            {/* strefy tempa */}
             <div className="compare-chart-card">
               <PaceZonesSection
                 first={comparison.first}

@@ -333,8 +333,34 @@ export const syncActivities = async (req, res) => {
       activities: newActivities,
     });
   } catch (error) {
-    console.error("Sync activities error:", error);
+    console.error("=== SYNC ACTIVITIES ERROR ===");
+    console.error("Error name:", error.name);
+    console.error("Error message:", error.message);
+    
+    // Obsługa Rate Limit Exceeded z Strava API
+    if (error.response?.status === 429) {
+      const resetTime = error.response.headers?.['x-ratelimit-reset'];
+      const resetDate = resetTime ? new Date(resetTime * 1000) : null;
+      
+      console.error("Strava Rate Limit Exceeded");
+      if (resetDate) {
+        console.error(`Rate limit resets at: ${resetDate.toLocaleString('pl-PL')}`);
+      }
+      
+      return res.status(429).json({
+        error: "Rate limit exceeded",
+        message: "Osiągnięto limit zapytań do Strava API. Spróbuj ponownie za kilka minut.",
+        rateLimitReset: resetDate ? resetDate.toISOString() : null,
+        details: "Strava API pozwala na 100 requestów na 15 minut i 1000 requestów dziennie."
+      });
+    }
+    
     console.error("Error stack:", error.stack);
+    if (error.response) {
+      console.error("API Response status:", error.response.status);
+      console.error("API Response data:", error.response.data);
+    }
+    
     res.status(500).json({
       error: "Failed to sync activities",
       details: error.message,

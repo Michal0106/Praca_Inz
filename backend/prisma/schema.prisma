@@ -24,6 +24,7 @@ model User {
   fitnessMetrics       FitnessMetrics[]
   refreshTokens        RefreshToken[]
   userStats            UserStats?
+  trainingPlans        TrainingPlan[]
 }
 
 model RefreshToken {
@@ -265,6 +266,83 @@ model Achievement {
 
   @@index([userId])
   @@index([earned])
+}
+
+model TrainingPlan {
+  id                String              @id @default(uuid())
+  userId            String
+  name              String
+  goal              String              // np. "Półmaraton poniżej 1:40"
+  targetRaceDate    DateTime?
+  weeksCount        Int
+  sessionsPerWeek   Int
+  trainingDays      Json                // [1,3,5,6] - dni tygodnia
+  status            TrainingPlanStatus  @default(ACTIVE)
+  generatedBy       String              @default("OPENAI")
+  analysisData      Json?               // Dane analizy użyte do wygenerowania
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weeks             PlanWeek[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+model PlanWeek {
+  id              String            @id @default(uuid())
+  trainingPlanId  String
+  weekNumber      Int
+  weekGoal        String?           // np. "Tydzień bazowy - budowanie wytrzymałości"
+  totalDistance   Float?
+  totalDuration   Int?
+  trainingPlan    TrainingPlan      @relation(fields: [trainingPlanId], references: [id], onDelete: Cascade)
+  workouts        PlanWorkout[]
+
+  @@unique([trainingPlanId, weekNumber])
+  @@index([trainingPlanId])
+}
+
+model PlanWorkout {
+  id              String          @id @default(uuid())
+  planWeekId      String
+  dayOfWeek       Int             // 1-7 (poniedziałek-niedziela)
+  workoutType     WorkoutType
+  name            String          // np. "Easy Run", "Tempo 5km"
+  description     String          @db.Text  // Szczegółowy opis ćwiczenia
+  targetDistance  Float?          // w km
+  targetDuration  Int?            // w minutach
+  targetPace      String?         // np. "5:00-5:15/km"
+  intensity       String?         // np. "Easy", "Moderate", "Hard"
+  intervals       Json?           // Szczegóły interwałów jeśli applicable
+  completed       Boolean         @default(false)
+  completedAt     DateTime?
+  actualDistance  Float?
+  actualDuration  Int?
+  notes           String?         @db.Text
+  planWeek        PlanWeek        @relation(fields: [planWeekId], references: [id], onDelete: Cascade)
+
+  @@index([planWeekId])
+  @@index([dayOfWeek])
+}
+
+enum TrainingPlanStatus {
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
+enum WorkoutType {
+  EASY_RUN
+  LONG_RUN
+  TEMPO_RUN
+  INTERVALS
+  FARTLEK
+  RECOVERY
+  RACE_PACE
+  HILL_REPEATS
+  CROSS_TRAINING
+  REST
 }
 
 enum DataSource {

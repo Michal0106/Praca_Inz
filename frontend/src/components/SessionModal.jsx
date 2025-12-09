@@ -4,7 +4,25 @@ import "./SessionModal.css";
 function SessionModal({ session, intervals, onClose }) {
   if (!session) return null;
 
-  const formatDuration = (minutes) => {
+  let parsedIntervals = null;
+  try {
+    if (typeof session.intervals === 'string') {
+      parsedIntervals = JSON.parse(session.intervals);
+    } else if (session.intervals && typeof session.intervals === 'object') {
+      parsedIntervals = session.intervals;
+    } else if (intervals) {
+      parsedIntervals = intervals;
+    }
+  } catch (e) {
+    console.error('Error parsing intervals:', e);
+    parsedIntervals = null;
+  }
+
+  const formatDuration = (value, isMinutes = true) => {
+    if (!value || value === 0) return "Brak danych";
+    
+    const minutes = isMinutes ? value : Math.round(value / 60);
+    
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
     if (hours > 0) {
@@ -29,7 +47,9 @@ function SessionModal({ session, intervals, onClose }) {
   };
 
   const getIntensityLabel = (intensity) => {
-    switch (intensity) {
+    if (!intensity) return "Brak danych";
+    const intensityUpper = intensity.toUpperCase();
+    switch (intensityUpper) {
       case "EASY":
         return "Łatwa";
       case "MODERATE":
@@ -37,6 +57,7 @@ function SessionModal({ session, intervals, onClose }) {
       case "HARD":
         return "Ciężka";
       case "VERY_HARD":
+      case "VERY HARD":
         return "Bardzo ciężka";
       default:
         return intensity;
@@ -44,7 +65,9 @@ function SessionModal({ session, intervals, onClose }) {
   };
 
   const getTypeLabel = (type) => {
-    switch (type) {
+    if (!type) return "Trening";
+    const typeUpper = type.toUpperCase();
+    switch (typeUpper) {
       case "EASY_RUN":
         return "Bieg regeneracyjny";
       case "LONG_RUN":
@@ -52,6 +75,7 @@ function SessionModal({ session, intervals, onClose }) {
       case "TEMPO_RUN":
         return "Bieg tempo";
       case "INTERVAL":
+      case "INTERVALS":
         return "Interwały";
       case "RECOVERY":
         return "Regeneracja";
@@ -59,8 +83,14 @@ function SessionModal({ session, intervals, onClose }) {
         return "Siłowy";
       case "CROSS_TRAINING":
         return "Trening krzyżowy";
+      case "REST":
+        return "Odpoczynek";
+      case "RACE_PACE":
+        return "Tempo wyścigowe";
+      case "FARTLEK":
+        return "Fartlek";
       default:
-        return type;
+        return type.replace(/_/g, " ");
     }
   };
 
@@ -71,7 +101,7 @@ function SessionModal({ session, intervals, onClose }) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-header">
-          <h2>{getTypeLabel(session.sessionType)}</h2>
+          <h2>{session.name || getTypeLabel(session.workoutType || session.sessionType)}</h2>
           <button className="modal-close" onClick={onClose}>
             <X size={24} />
           </button>
@@ -84,19 +114,33 @@ function SessionModal({ session, intervals, onClose }) {
               <div>
                 <div className="summary-label">Czas trwania</div>
                 <div className="summary-value">
-                  {formatDuration(session.duration)}
+                  {session.targetDuration 
+                    ? formatDuration(session.targetDuration, true)
+                    : formatDuration(session.duration, false)}
                 </div>
               </div>
             </div>
 
-            {session.distance && (
+            {(session.targetDistance || session.distance) && (
               <div className="summary-item">
                 <Target size={20} />
                 <div>
                   <div className="summary-label">Dystans</div>
                   <div className="summary-value">
-                    {(session.distance / 1000).toFixed(1)} km
+                    {session.targetDistance 
+                      ? session.targetDistance.toFixed(1) 
+                      : (session.distance / 1000).toFixed(1)} km
                   </div>
+                </div>
+              </div>
+            )}
+
+            {session.targetPace && (
+              <div className="summary-item">
+                <Activity size={20} />
+                <div>
+                  <div className="summary-label">Tempo docelowe</div>
+                  <div className="summary-value">{session.targetPace}</div>
                 </div>
               </div>
             )}
@@ -126,30 +170,39 @@ function SessionModal({ session, intervals, onClose }) {
             </div>
           )}
 
-          {intervals && (
+          {parsedIntervals && (
             <div className="interval-details">
-              <h3>Szczegóły interwałów</h3>
-              <div className="interval-info">
-                <div className="interval-item">
-                  <span className="interval-label">Liczba powtórzeń:</span>
-                  <span className="interval-value">{intervals.sets}</span>
-                </div>
-                <div className="interval-item">
-                  <span className="interval-label">
-                    Czas pojedynczego interwału:
-                  </span>
-                  <span className="interval-value">
-                    {intervals.duration} min
-                  </span>
-                </div>
-                <div className="interval-item">
-                  <span className="interval-label">
-                    Łączny czas interwałów:
-                  </span>
-                  <span className="interval-value">
-                    {intervals.sets * intervals.duration} min
-                  </span>
-                </div>
+              <h3>Struktura treningu interwałowego</h3>
+              <div className="interval-sequence">
+                {parsedIntervals.warmup && (
+                  <div className="interval-phase warmup">
+                    <div className="phase-content">
+                      <div className="phase-label">Rozgrzewka</div>
+                      <div className="phase-value">{parsedIntervals.warmup}</div>
+                    </div>
+                  </div>
+                )}
+                {parsedIntervals.intervals && (
+                  <div className="interval-phase main-work">
+                    <div className="phase-content">
+                      <div className="phase-label">Część główna</div>
+                      <div className="phase-value">{parsedIntervals.intervals}</div>
+                      {parsedIntervals.recovery && (
+                        <div className="phase-recovery">
+                          <span className="recovery-text">{parsedIntervals.recovery}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {parsedIntervals.cooldown && (
+                  <div className="interval-phase cooldown">
+                    <div className="phase-content">
+                      <div className="phase-label">Wyciszenie</div>
+                      <div className="phase-value">{parsedIntervals.cooldown}</div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -164,7 +217,7 @@ function SessionModal({ session, intervals, onClose }) {
           <div className="session-notes">
             <h3>Wskazówki</h3>
             <ul>
-              {session.sessionType === "EASY_RUN" && (
+              {(session.sessionType === "EASY_RUN" || session.workoutType === "EASY_RUN") && (
                 <>
                   <li>
                     Utrzymuj komfortowe tempo, przy którym możesz swobodnie
@@ -173,7 +226,7 @@ function SessionModal({ session, intervals, onClose }) {
                   <li>Skup się na technice biegu i relaksacji</li>
                 </>
               )}
-              {session.sessionType === "LONG_RUN" && (
+              {(session.sessionType === "LONG_RUN" || session.workoutType === "LONG_RUN") && (
                 <>
                   <li>
                     Rozpocznij w wolnym tempie i stopniowo zwiększaj
@@ -182,7 +235,8 @@ function SessionModal({ session, intervals, onClose }) {
                   <li>Pamiętaj o regularnym nawadnianiu</li>
                 </>
               )}
-              {session.sessionType === "INTERVAL" && (
+              {(session.sessionType === "INTERVAL" || session.sessionType === "INTERVALS" || 
+                session.workoutType === "INTERVALS") && (
                 <>
                   <li>Rozgrzewka 10-15 minut w łatwym tempie</li>
                   <li>
@@ -191,7 +245,7 @@ function SessionModal({ session, intervals, onClose }) {
                   <li>Zakończ 10-minutową rozciągką</li>
                 </>
               )}
-              {session.sessionType === "RECOVERY" && (
+              {(session.sessionType === "RECOVERY" || session.workoutType === "RECOVERY") && (
                 <>
                   <li>
                     To trening regeneracyjny - priorytetem jest odpoczynek
