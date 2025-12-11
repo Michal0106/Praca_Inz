@@ -15,6 +15,9 @@ import MyTrainingPlansPage from "./pages/MyTrainingPlansPage";
 import CreateTrainingPlanPage from "./pages/CreateTrainingPlanPage";
 import TrainingPlanDetailPage from "./pages/TrainingPlanDetailPage";
 import ComparePage from "./pages/ComparePage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
+
 
 function App() {
   const [authInitialized, setAuthInitialized] = useState(false);
@@ -62,6 +65,8 @@ function App() {
           <Route path="/training-plans/create" element={<CreateTrainingPlanPage />} />
           <Route path="/training-plans/:planId" element={<TrainingPlanDetailPage />} />
           <Route path="/compare" element={<ComparePage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
         </Routes>
       </FilterProvider>
     </Router>
