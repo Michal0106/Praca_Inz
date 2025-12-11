@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { RefreshCw, LogOut } from "lucide-react";
 import Layout from "../components/Layout";
 import GlobalFilters from "../components/GlobalFilters";
+import ActivityModal from "../components/ActivityModal";
 import { useFilters } from "../context/FilterContext";
 import { useAuth } from "../hooks/useAuth";
 import { authAPI, activitiesAPI } from "../services/api";
@@ -20,6 +21,10 @@ function DashboardPage() {
   });
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [selectedActivity, setSelectedActivity] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [activitiesPerPage] = useState(10);
   const navigate = useNavigate();
   const { activityType, dateRange } = useFilters();
   const params = new URLSearchParams(window.location.search);
@@ -42,6 +47,7 @@ if (params.get("auth") === "success") {
   useEffect(() => {
     if (!loading) {
       fetchActivities();
+      setCurrentPage(1); 
     }
   }, [activityType, dateRange?.start, dateRange?.end, loading]);
 
@@ -79,7 +85,7 @@ if (params.get("auth") === "success") {
       const activitiesData = await activitiesAPI.getActivities(params);
       const fetchedActivities = activitiesData.data.activities || [];
       
-      setActivities(fetchedActivities.slice(0, 50));
+      setActivities(fetchedActivities);
 
       const stats = {
         totalActivities: fetchedActivities.length,
@@ -175,6 +181,16 @@ if (params.get("auth") === "success") {
     }
   };
 
+  const handleActivityClick = async (activityId) => {
+    try {
+      const res = await activitiesAPI.getActivityById(activityId);
+      setSelectedActivity(res.data.activity);
+      setShowModal(true);
+    } catch (error) {
+      console.error("Fetch activity details error:", error);
+    }
+  };
+
   const handleLogout = async () => {
     try {
       await authAPI.logout();
@@ -185,6 +201,23 @@ if (params.get("auth") === "success") {
     } catch (error) {
       console.error("Logout error:", error);
     }
+  };
+
+  const getActivityTypeColor = (type) => {
+    const colors = {
+      'Run': '#ff6b6b',
+      'Ride': '#4ecdc4',
+      'Swim': '#45b7d1',
+      'Walk': '#96ceb4',
+      'Hike': '#96d252ff',
+      'VirtualRide': '#a29bfe',
+      'VirtualRun': '#fd79a8',
+      'Workout': '#ffc04cff',
+      'WeightTraining': '#e17055',
+      'Yoga': '#dfe6e9',
+      'default': '#667eea'
+    };
+    return colors[type] || colors.default;
   };
 
   if (authLoading || loading) {
@@ -269,43 +302,109 @@ if (params.get("auth") === "success") {
               treningi.
             </p>
           ) : (
-            <div className="activities-list">
-              {activities.map((activity) => (
-                <div key={activity.id} className="activity-item">
-                  <div className="activity-info">
-                    <h4>{activity.name}</h4>
-                    <p className="activity-type">{activity.type}</p>
-                    <p className="activity-date">
-                      {new Date(activity.startDate).toLocaleDateString("pl-PL")}
-                    </p>
-                  </div>
-                  <div className="activity-stats">
-                    <div className="activity-stat">
-                      <span className="label">Dystans</span>
-                      <span className="value">
-                        {(activity.distance / 1000).toFixed(2)} km
-                      </span>
-                    </div>
-                    <div className="activity-stat">
-                      <span className="label">Czas</span>
-                      <span className="value">
-                        {Math.floor(activity.duration / 60)} min
-                      </span>
-                    </div>
-                    {activity.averageHeartRate && (
-                      <div className="activity-stat">
-                        <span className="label">Śr. tętno</span>
-                        <span className="value">
-                          {activity.averageHeartRate} bpm
-                        </span>
+            <>
+              <div className="activities-list">
+                {activities
+                  .slice((currentPage - 1) * activitiesPerPage, currentPage * activitiesPerPage)
+                  .map((activity) => (
+                    <div 
+                      key={activity.id} 
+                      className="activity-item"
+                      onClick={() => handleActivityClick(activity.id)}
+                    >
+                      <div className="activity-main">
+                        <div className="activity-header">
+                          <h4>{activity.name}</h4>
+                          <span 
+                            className="activity-type-badge"
+                            style={{ backgroundColor: getActivityTypeColor(activity.type) }}
+                          >
+                            {activity.type}
+                          </span>
+                        </div>
+                        <p className="activity-date">
+                          {new Date(activity.startDate).toLocaleDateString("pl-PL", {
+                            weekday: 'short',
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                          })}
+                        </p>
                       </div>
-                    )}
-                  </div>
+                      <div className="activity-metrics">
+                        <div className="metric-item">
+                          <div className="metric-content">
+                            <span className="metric-value">
+                              {(activity.distance / 1000).toFixed(2)}
+                            </span>
+                            <span className="metric-label">km</span>
+                          </div>
+                        </div>
+                        <div className="metric-item">
+                          <div className="metric-content">
+                            <span className="metric-value">
+                              {Math.floor(activity.duration / 60)}
+                            </span>
+                            <span className="metric-label">min</span>
+                          </div>
+                        </div>
+                        {activity.averageHeartRate && (
+                          <div className="metric-item">
+                            <div className="metric-content">
+                              <span className="metric-value">
+                                {activity.averageHeartRate}
+                              </span>
+                              <span className="metric-label">bpm</span>
+                            </div>
+                          </div>
+                        )}
+                        {activity.elevationGain > 0 && (
+                          <div className="metric-item">
+                            <div className="metric-content">
+                              <span className="metric-value">
+                                {Math.round(activity.elevationGain)}
+                              </span>
+                              <span className="metric-label">wznios</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      <div className="activity-arrow">→</div>
+                    </div>
+                  ))}
+              </div>
+              
+              {activities.length > activitiesPerPage && (
+                <div className="pagination">
+                  <button
+                    className="pagination-btn"
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                  >
+                    Poprzednia
+                  </button>
+                  <span className="pagination-info">
+                    Strona {currentPage} z {Math.ceil(activities.length / activitiesPerPage)}
+                  </span>
+                  <button
+                    className="pagination-btn"
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(activities.length / activitiesPerPage)))}
+                    disabled={currentPage === Math.ceil(activities.length / activitiesPerPage)}
+                  >
+                    Następna
+                  </button>
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </div>
+
+        {showModal && selectedActivity && (
+          <ActivityModal
+            activity={selectedActivity}
+            onClose={() => setShowModal(false)}
+          />
+        )}
       </div>
     </Layout>
   );
