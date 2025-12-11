@@ -311,45 +311,65 @@ if (params.get("auth") === "success") {
                       key={activity.id} 
                       className="activity-item"
                       onClick={() => handleActivityClick(activity.id)}
-                      style={{ 
-                        cursor: 'pointer',
-                        borderLeft: `4px solid ${getActivityTypeColor(activity.type)}`
-                      }}
                     >
-                      <div className="activity-info">
-                        <h4>{activity.name}</h4>
-                        <p 
-                          className="activity-type"
-                          style={{ color: getActivityTypeColor(activity.type) }}
-                        >
-                          {activity.type}
-                        </p>
+                      <div className="activity-main">
+                        <div className="activity-header">
+                          <h4>{activity.name}</h4>
+                          <span 
+                            className="activity-type-badge"
+                            style={{ backgroundColor: getActivityTypeColor(activity.type) }}
+                          >
+                            {activity.type}
+                          </span>
+                        </div>
                         <p className="activity-date">
-                          {new Date(activity.startDate).toLocaleDateString("pl-PL")}
+                          {new Date(activity.startDate).toLocaleDateString("pl-PL", {
+                            weekday: 'short',
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                          })}
                         </p>
                       </div>
-                      <div className="activity-stats">
-                        <div className="activity-stat">
-                          <span className="label">Dystans</span>
-                          <span className="value">
-                            {(activity.distance / 1000).toFixed(2)} km
-                          </span>
+                      <div className="activity-metrics">
+                        <div className="metric-item">
+                          <div className="metric-content">
+                            <span className="metric-value">
+                              {(activity.distance / 1000).toFixed(2)}
+                            </span>
+                            <span className="metric-label">km</span>
+                          </div>
                         </div>
-                        <div className="activity-stat">
-                          <span className="label">Czas</span>
-                          <span className="value">
-                            {Math.floor(activity.duration / 60)} min
-                          </span>
+                        <div className="metric-item">
+                          <div className="metric-content">
+                            <span className="metric-value">
+                              {Math.floor(activity.duration / 60)}
+                            </span>
+                            <span className="metric-label">min</span>
+                          </div>
                         </div>
                         {activity.averageHeartRate && (
-                          <div className="activity-stat">
-                            <span className="label">Śr. tętno</span>
-                            <span className="value">
-                              {activity.averageHeartRate} bpm
-                            </span>
+                          <div className="metric-item">
+                            <div className="metric-content">
+                              <span className="metric-value">
+                                {activity.averageHeartRate}
+                              </span>
+                              <span className="metric-label">bpm</span>
+                            </div>
+                          </div>
+                        )}
+                        {activity.elevationGain > 0 && (
+                          <div className="metric-item">
+                            <div className="metric-content">
+                              <span className="metric-value">
+                                {Math.round(activity.elevationGain)}
+                              </span>
+                              <span className="metric-label">wznios</span>
+                            </div>
                           </div>
                         )}
                       </div>
+                      <div className="activity-arrow">→</div>
                     </div>
                   ))}
               </div>

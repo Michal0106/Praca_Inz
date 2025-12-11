@@ -43,6 +43,23 @@ function ActivityModal({ activity, onClose }) {
     return `${mins}:${secs.toString().padStart(2, '0')}/km`;
   };
 
+  const getActivityTypeColor = (type) => {
+    const colors = {
+      'Run': '#ff6b6b',
+      'Ride': '#4ecdc4',
+      'Swim': '#45b7d1',
+      'Walk': '#96ceb4',
+      'Hike': '#96d252ff',
+      'VirtualRide': '#a29bfe',
+      'VirtualRun': '#fd79a8',
+      'Workout': '#ffc04cff',
+      'WeightTraining': '#e17055',
+      'Yoga': '#dfe6e9',
+      'default': '#667eea'
+    };
+    return colors[type] || colors.default;
+  };
+
   const hasBestEfforts = activity.bestEfforts && Array.isArray(activity.bestEfforts) && activity.bestEfforts.length > 0;
   const hasLaps = activity.laps && Array.isArray(activity.laps) && activity.laps.length > 0;
 
@@ -73,80 +90,79 @@ function ActivityModal({ activity, onClose }) {
         </div>
 
         <div className="modal-body">
-          <div className="activity-detail-grid">
-            <div className="detail-item">
-              <span className="detail-label">Typ</span>
-              <span className="detail-value">{activity.type}</span>
+          <div className="activity-stats-cards">
+            <div className="stat-card-primary">
+              <span className="stat-card-label">Dystans</span>
+              <div className="stat-card-value-row">
+                <span className="stat-card-value">{formatDistance(activity.distance || 0)}</span>
+                <span className="stat-card-unit">km</span>
+              </div>
             </div>
 
-            <div className="detail-item">
-              <span className="detail-label">Data</span>
-              <span className="detail-value">
-                {formatDate(activity.startDate)}
-              </span>
+            <div className="stat-card-primary">
+              <span className="stat-card-label">Czas</span>
+              <span className="stat-card-value">{formatDuration(activity.duration || 0)}</span>
             </div>
 
-            <div className="detail-item">
-              <span className="detail-label">Dystans</span>
-              <span className="detail-value">
-                {formatDistance(activity.distance || 0)} km
-              </span>
-            </div>
-
-            <div className="detail-item">
-              <span className="detail-label">Czas</span>
-              <span className="detail-value">
-                {formatDuration(activity.duration || 0)}
-              </span>
+            <div className="stat-card-primary">
+              <span className="stat-card-label">Śr. prędkość</span>
+              <div className="stat-card-value-row">
+                <span className="stat-card-value">{((activity.averageSpeed || 0) * 3.6).toFixed(1)}</span>
+                <span className="stat-card-unit">km/h</span>
+              </div>
             </div>
 
             {activity.averageHeartRate && (
-              <div className="detail-item">
-                <span className="detail-label">Śr. tętno</span>
-                <span className="detail-value">
-                  {activity.averageHeartRate} bpm
-                </span>
+              <div className="stat-card-primary">
+                <span className="stat-card-label">Śr. tętno</span>
+                <div className="stat-card-value-row">
+                  <span className="stat-card-value">{activity.averageHeartRate}</span>
+                  <span className="stat-card-unit">bpm</span>
+                </div>
               </div>
             )}
+          </div>
 
+          <div className="activity-info-row">
+            <div className="info-item">
+              <span className="info-label">Typ</span>
+              <span 
+                className="info-value activity-type-badge" 
+                style={{ backgroundColor: getActivityTypeColor(activity.type) }}
+              >
+                {activity.type}
+              </span>
+            </div>
+            <div className="info-item">
+              <span className="info-label">Data</span>
+              <span className="info-value">{formatDate(activity.startDate)}</span>
+            </div>
+          </div>
+
+          <div className="activity-secondary-stats">
             {activity.maxHeartRate && (
-              <div className="detail-item">
-                <span className="detail-label">Max tętno</span>
-                <span className="detail-value">
-                  {activity.maxHeartRate} bpm
-                </span>
+              <div className="secondary-stat">
+                <span className="secondary-label">Max tętno</span>
+                <span className="secondary-value">{activity.maxHeartRate} bpm</span>
               </div>
             )}
 
-            {activity.averageSpeed && (
-              <div className="detail-item">
-                <span className="detail-label">Śr. prędkość</span>
-                <span className="detail-value">
-                  {(activity.averageSpeed * 3.6).toFixed(1)} km/h
-                </span>
-              </div>
-            )}
-
-            {activity.maxSpeed && (
-              <div className="detail-item">
-                <span className="detail-label">Max prędkość</span>
-                <span className="detail-value">
-                  {(activity.maxSpeed * 3.6).toFixed(1)} km/h
-                </span>
-              </div>
-            )}
+            <div className="secondary-stat">
+              <span className="secondary-label">Max prędkość</span>
+              <span className="secondary-value">{((activity.maxSpeed || 0) * 3.6).toFixed(1)} km/h</span>
+            </div>
 
             {activity.elevationGain !== undefined && activity.elevationGain !== null && (
-              <div className="detail-item">
-                <span className="detail-label">Przewyższenie</span>
-                <span className="detail-value">{activity.elevationGain} m</span>
+              <div className="secondary-stat">
+                <span className="secondary-label">Przewyższenie</span>
+                <span className="secondary-value">{activity.elevationGain} m</span>
               </div>
             )}
 
             {activity.calories && (
-              <div className="detail-item">
-                <span className="detail-label">Kalorie</span>
-                <span className="detail-value">{activity.calories} kcal</span>
+              <div className="secondary-stat">
+                <span className="secondary-label">Kalorie</span>
+                <span className="secondary-value">{activity.calories} kcal</span>
               </div>
             )}
           </div>
