@@ -25,7 +25,28 @@ model User {
   refreshTokens        RefreshToken[]
   userStats            UserStats?
   trainingPlans        TrainingPlan[]
+  passwordResetTokens  PasswordResetToken[]
+
 }
+
+
+
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  used      Boolean  @default(false)
+
+  @@index([userId])
+}
+
+
+
+
 
 model RefreshToken {
   id        String   @id @default(uuid())

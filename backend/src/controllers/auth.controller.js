@@ -3,6 +3,10 @@ import prisma from "../config/database.js";
 import { stravaService } from "../services/strava.service.js";
 import { jwtService } from "../services/jwt.service.js";
 
+import crypto from "crypto";
+import { sendPasswordResetEmail } from "../services/email.service.js";
+
+
 
 export const register = async (req, res) => {
   try {
@@ -145,6 +149,135 @@ export const logout = async (req, res) => {
   }
 };
 
+
+
+export const requestPasswordReset = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: "Email jest wymagany" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email },
+    });
+
+
+    if (!user) {
+      return res.json({
+        message:
+          "Jeśli konto z tym adresem istnieje, wysłaliśmy instrukcje resetu hasła.",
+      });
+    }
+
+  
+    const token = crypto.randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1h
+
+
+
+    await prisma.passwordResetToken.updateMany({
+      where: {
+        userId: user.id,
+        used: false,
+        expiresAt: { gt: new Date() },
+      },
+      data: { used: true },
+    });
+
+
+    await prisma.passwordResetToken.create({
+      data: {
+        token,
+        userId: user.id,
+        expiresAt,
+      },
+    });
+
+    const appUrl = process.env.APP_URL || "http://localhost:5173";
+    const resetUrl = `${appUrl}/reset-password?token=${token}`;
+
+    console.log("[PasswordReset] Generating reset link for %s: %s", email, resetUrl);
+
+    await sendPasswordResetEmail(email, resetUrl);
+
+    return res.json({
+      message:
+        "Jeśli konto z tym adresem istnieje, wysłaliśmy instrukcje resetu hasła.",
+    });
+  } catch (err) {
+    console.error("[PasswordReset] Error:", err);
+    return res.status(500).json({ error: "Nie udało się przetworzyć żądania resetu hasła" });
+  }
+};
+
+
+
+
+
+export const resetPassword = async (req, res) => {
+  try {
+    const { token, password } = req.body;
+
+    if (!token || !password) {
+      return res
+        .status(400)
+        .json({ error: "Token i nowe hasło są wymagane" });
+    }
+
+    if (password.length < 8) {
+      return res
+        .status(400)
+        .json({ error: "Hasło musi mieć co najmniej 8 znaków" });
+    }
+
+    const resetToken = await prisma.passwordResetToken.findUnique({
+      where: { token },
+    });
+
+    if (
+      !resetToken ||
+      resetToken.used ||
+      resetToken.expiresAt < new Date()
+    ) {
+      return res
+        .status(400)
+        .json({ error: "Token jest nieprawidłowy lub wygasł" });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: resetToken.userId },
+        data: { password: hashedPassword },
+      }),
+      prisma.passwordResetToken.update({
+        where: { id: resetToken.id },
+        data: { used: true },
+      }),
+  
+
+      
+      prisma.passwordResetToken.updateMany({
+        where: {
+          userId: resetToken.userId,
+          token: { not: token },
+          used: false,
+        },
+        data: { used: true },
+      }),
+    ]);
+
+    return res.json({ message: "Hasło zostało zaktualizowane" });
+  } catch (error) {
+    console.error("resetPassword error:", error);
+    return res
+      .status(500)
+      .json({ error: "Nie udało się zresetować hasła" });
+  }
+};
 
 
 

@@ -8,6 +8,8 @@ import {
   stravaAuth,
   stravaCallback,
   unlinkStrava,
+  requestPasswordReset,
+  resetPassword,
 } from "../controllers/auth.controller.js";
 import {
   authenticateJWT,
@@ -25,5 +27,9 @@ router.get("/me", authenticateJWT, getCurrentUser);
 router.get("/strava", optionalAuthenticateJWT, stravaAuth);
 router.get("/strava/callback", optionalAuthenticateJWT, stravaCallback);
 router.post("/strava/unlink", authenticateJWT, unlinkStrava);
+
+router.post("/forgot-password", requestPasswordReset);
+router.post("/reset-password", resetPassword);
+
 
 export default router;

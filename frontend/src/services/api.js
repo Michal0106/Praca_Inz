@@ -94,6 +94,13 @@ export const authAPI = {
   getCurrentUser: () => api.get("/auth/me"),
   refresh: (refreshToken) => api.post("/auth/refresh", { refreshToken }),
   unlinkStrava: () => api.post("/auth/strava/unlink"),
+
+  
+
+  requestPasswordReset: (email) => api.post("/auth/forgot-password", { email }),
+  resetPassword: ({ token, password }) => api.post("/auth/reset-password", { token, password }),
+
+
   initAuth: async () => {
     const token = localStorage.getItem("accessToken");
     const refreshToken = localStorage.getItem("refreshToken");
