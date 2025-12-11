@@ -200,6 +200,23 @@ if (params.get("auth") === "success") {
     }
   };
 
+  const getActivityTypeColor = (type) => {
+    const colors = {
+      'Run': '#ff6b6b',
+      'Ride': '#4ecdc4',
+      'Swim': '#45b7d1',
+      'Walk': '#96ceb4',
+      'Hike': '#96d252ff',
+      'VirtualRide': '#a29bfe',
+      'VirtualRun': '#fd79a8',
+      'Workout': '#ffc04cff',
+      'WeightTraining': '#e17055',
+      'Yoga': '#dfe6e9',
+      'default': '#667eea'
+    };
+    return colors[type] || colors.default;
+  };
+
   if (authLoading || loading) {
     return (
       <Layout>
@@ -288,11 +305,19 @@ if (params.get("auth") === "success") {
                   key={activity.id} 
                   className="activity-item"
                   onClick={() => handleActivityClick(activity.id)}
-                  style={{ cursor: 'pointer' }}
+                  style={{ 
+                    cursor: 'pointer',
+                    borderLeft: `4px solid ${getActivityTypeColor(activity.type)}`
+                  }}
                 >
                   <div className="activity-info">
                     <h4>{activity.name}</h4>
-                    <p className="activity-type">{activity.type}</p>
+                    <p 
+                      className="activity-type"
+                      style={{ color: getActivityTypeColor(activity.type) }}
+                    >
+                      {activity.type}
+                    </p>
                     <p className="activity-date">
                       {new Date(activity.startDate).toLocaleDateString("pl-PL")}
                     </p>
