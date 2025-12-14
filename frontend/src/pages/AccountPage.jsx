@@ -29,12 +29,22 @@ function AccountPage() {
 
     const stravaLinked = searchParams.get("strava") === "linked";
     const stravaError = searchParams.get("error");
+    const googleStatus = searchParams.get("google");
 
     if (stravaLinked) {
       setShowSuccessMessage(true);
       setSearchParams({});
       setTimeout(() => setShowSuccessMessage(false), 5000);
       setTimeout(() => handleFirstSync(), 1500);
+    }
+
+    if (googleStatus === "success") {
+      alert("✅ Google Calendar został połączony pomyślnie!\n\nMożesz teraz synchronizować plany treningowe z kalendarzem.");
+      setSearchParams({});
+      fetchUserData();
+    } else if (googleStatus === "error") {
+      alert("❌ Wystąpił błąd podczas łączenia z Google Calendar.\n\nSpróbuj ponownie.");
+      setSearchParams({});
     }
 
     if (stravaError === "strava_already_linked") {
@@ -113,6 +123,33 @@ function AccountPage() {
         "Błąd podczas odłączania konta Strava: " +
           (error.response?.data?.error || error.message),
       );
+    }
+  };
+
+  const handleLinkGoogle = async () => {
+    setLinking(true);
+    try {
+      const response = await authAPI.googleAuth();
+      window.location.href = response.data.authUrl;
+    } catch (error) {
+      console.error("Google auth error:", error);
+      alert("Błąd podczas łączenia z Google Calendar: " + (error.response?.data?.error || error.message));
+      setLinking(false);
+    }
+  };
+
+  const handleUnlinkGoogle = async () => {
+    if (!confirm("Czy na pewno chcesz odłączyć Google Calendar?\n\n⚠️ WAŻNE: Musisz ponownie połączyć konto, aby synchronizacja kalendarza działała poprawnie.")) {
+      return;
+    }
+
+    try {
+      await authAPI.unlinkGoogle();
+      await fetchUserData();
+      alert("✅ Google Calendar został odłączony.\n\n📅 Połącz ponownie, aby synchronizować treningi z kalendarzem.");
+    } catch (error) {
+      console.error("Unlink Google error:", error);
+      alert("Błąd podczas odłączania Google Calendar: " + (error.response?.data?.error || error.message));
     }
   };
 
@@ -274,6 +311,81 @@ function AccountPage() {
                       {linking
                         ? "Przekierowywanie..."
                         : "Połącz z kontem Strava"}
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="connection-card">
+              <div className="connection-header">
+                <div className="connection-info">
+                  <div className="connection-icon google-icon">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <h3>Google Calendar</h3>
+                    <p className="connection-description">
+                      Synchronizuj plany treningowe z kalendarzem
+                    </p>
+                  </div>
+                </div>
+                <div className="connection-status">
+                  {user?.hasGoogleCalendar ? (
+                    <span className="status-badge connected">
+                      <span className="status-dot"></span>
+                      Połączone
+                    </span>
+                  ) : (
+                    <span className="status-badge disconnected">
+                      <span className="status-dot"></span>
+                      Niepołączone
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="connection-actions">
+                {user?.hasGoogleCalendar ? (
+                  <>
+                    <div className="connection-details">
+                      <p>✅ Twoje konto Google Calendar jest połączone</p>
+                      <p className="text-muted">
+                        Możesz teraz synchronizować plany treningowe z kalendarzem
+                      </p>
+                    </div>
+                    <button
+                      className="btn-secondary"
+                      onClick={handleUnlinkGoogle}
+                    >
+                      <Unlink size={18} />
+                      Odłącz Google Calendar
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div className="connection-details">
+                      <p>
+                        📅 Połącz Google Calendar, aby wysyłać treningi do kalendarza
+                      </p>
+                      <p className="text-muted">
+                        Po połączeniu będziesz mógł automatycznie dodawać treningi do swojego kalendarza Google
+                      </p>
+                    </div>
+                    <button
+                      className="btn-primary"
+                      onClick={handleLinkGoogle}
+                      disabled={linking}
+                    >
+                      <Link2 size={18} className={linking ? "spinning" : ""} />
+                      {linking
+                        ? "Przekierowywanie..."
+                        : "Połącz z Google Calendar"}
                     </button>
                   </>
                 )}

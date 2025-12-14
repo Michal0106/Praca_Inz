@@ -54,10 +54,10 @@ const computePaceStats = (pacePerKmRaw) => {
   const firstAvg = avg(firstHalf);
   const secondAvg = avg(secondHalf);
 
-  const delta = secondAvg - firstAvg; // min/km (dodatni = wolniej na końcu)
+  const delta = secondAvg - firstAvg; 
   const deltaSec = toSeconds(delta);
 
-  const thresholdMin = 0.05; // ~3 s/km
+  const thresholdMin = 0.05; 
   let splitType = "even";
   if (delta <= -thresholdMin) splitType = "negative";
   else if (delta >= thresholdMin) splitType = "positive";
@@ -66,7 +66,6 @@ const computePaceStats = (pacePerKmRaw) => {
     meanPace: round(mean),
     stdDevPace: round(stdDev),
     stdDevSeconds: stdDev != null ? Math.round(toSeconds(stdDev)) : null,
-    //stdDevSeconds: deltaSec != null ? Math.round(toSeconds(stdDev)) : null,
     cvPace: cv != null ? round(cv, 4) : null,
     firstHalfPace: round(firstAvg),
     secondHalfPace: round(secondAvg),
@@ -616,7 +615,6 @@ export const compareActivities = async (req, res) => {
             }
           : null,
         pacePerKm,
-        //
         paceStats: computePaceStats(pacePerKm),
         paceZones: computePaceZones(pacePerKm),
         climbMetrics: computeClimbMetrics(a),

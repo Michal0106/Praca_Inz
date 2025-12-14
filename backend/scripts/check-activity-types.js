@@ -4,7 +4,6 @@ async function checkActivityTypes() {
   try {
     console.log("=== TYPY AKTYWNOŚCI W BAZIE ===\n");
 
-    // Pobierz unikalne typy aktywności
     const activities = await prisma.activity.findMany({
       select: {
         type: true,
@@ -26,7 +25,6 @@ async function checkActivityTypes() {
 
     console.log(`\nŁącznie: ${activities.length} aktywności`);
 
-    // Pokaż przykładowe aktywności typu związanego z bieganiem
     console.log("\n=== PRZYKŁADOWE AKTYWNOŚCI BIEGOWE ===\n");
     
     const runActivities = await prisma.activity.findMany({

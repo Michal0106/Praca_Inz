@@ -162,20 +162,13 @@ if (params.get("auth") === "success") {
     try {
       const response = await activitiesAPI.syncActivities();
       
-      const detailsResponse = await activitiesAPI.syncBestEfforts();
-      
       await fetchUserData();
       
       let message = "Dane zsynchronizowane pomyślnie!";
       if (response.data.newActivitiesCount > 0) {
         message += `\n\nNowe aktywności: ${response.data.newActivitiesCount}`;
       }
-      if (detailsResponse.data.updated > 0) {
-        message += `\nZaktualizowano szczegóły: ${detailsResponse.data.updated} aktywności`;
-      }
-      if (detailsResponse.data.lapsUpdated > 0) {
-        message += `\nZ odcinkami (laps): ${detailsResponse.data.lapsUpdated}`;
-      }
+      message += `\n\n💡 Aby pobrać szczegóły (best efforts, odcinki, GPS), kliknij na aktywność i użyj przycisku na dole.`;
       
       alert(message);
     } catch (error) {
@@ -229,6 +222,17 @@ if (params.get("auth") === "success") {
       setShowModal(true);
     } catch (error) {
       console.error("Fetch activity details error:", error);
+    }
+  };
+
+  const handleRefreshActivity = async () => {
+    if (selectedActivity) {
+      try {
+        const res = await activitiesAPI.getActivityById(selectedActivity.id);
+        setSelectedActivity(res.data.activity);
+      } catch (error) {
+        console.error("Refresh activity error:", error);
+      }
     }
   };
 
@@ -482,6 +486,7 @@ if (params.get("auth") === "success") {
         {showModal && selectedActivity && (
           <ActivityModal
             activity={selectedActivity}
+            onRefresh={handleRefreshActivity}
             onClose={() => setShowModal(false)}
           />
         )}

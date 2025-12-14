@@ -129,6 +129,17 @@ function DataPage() {
     }
   };
 
+  const handleRefreshActivity = async () => {
+    if (selectedActivity) {
+      try {
+        const res = await activitiesAPI.getActivityById(selectedActivity.id);
+        setSelectedActivity(res.data.activity);
+      } catch (error) {
+        console.error("Refresh activity error:", error);
+      }
+    }
+  };
+
   const formatDuration = (seconds) => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
@@ -259,6 +270,7 @@ function DataPage() {
         {showModal && (
           <ActivityModal
             activity={selectedActivity}
+            onRefresh={handleRefreshActivity}
             onClose={() => {
               setShowModal(false);
               setSelectedActivity(null);

@@ -13,6 +13,7 @@ import {
   getPlanTemplates,
   getPlanById,
   getSessionById,
+  syncPlanToCalendar,
 } from "../controllers/trainingPlan.controller.js";
 
 const router = express.Router();
@@ -25,6 +26,7 @@ router.get("/my-plans/:planId", authenticate, getTrainingPlanById);
 router.patch("/workout/:workoutId/complete", authenticate, completeWorkout);
 router.patch("/my-plans/:planId/status", authenticate, updatePlanStatus);
 router.delete("/my-plans/:planId", authenticate, deleteTrainingPlan);
+router.post("/my-plans/:id/sync-to-calendar", authenticate, syncPlanToCalendar);
 
 router.get("/recommend", authenticate, getRecommendedPlan);
 router.get("/templates", authenticate, getPlanTemplates);

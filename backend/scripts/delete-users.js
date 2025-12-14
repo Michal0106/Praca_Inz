@@ -4,7 +4,6 @@ async function deleteAllUsers() {
   try {
     console.log("=== USUWANIE WSZYSTKICH UŻYTKOWNIKÓW ===\n");
 
-    // Najpierw usuń powiązane dane
     console.log("Usuwam aktywności...");
     const deletedActivities = await prisma.activity.deleteMany({});
     console.log(`✓ Usunięto ${deletedActivities.count} aktywności\n`);
@@ -21,7 +20,6 @@ async function deleteAllUsers() {
     const deletedPlans = await prisma.trainingPlan.deleteMany({});
     console.log(`✓ Usunięto ${deletedPlans.count} planów treningowych\n`);
 
-    // Na końcu usuń użytkowników
     console.log("Usuwam użytkowników...");
     const deletedUsers = await prisma.user.deleteMany({});
     console.log(`✓ Usunięto ${deletedUsers.count} użytkowników\n`);

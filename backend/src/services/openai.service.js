@@ -6,110 +6,112 @@ const ollamaClient = new OpenAI({
   apiKey: 'ollama', 
 });
 
-const MODEL_NAME = 'qwen2.5:7b';
+const MODEL_NAME = 'qwen2.5-optimized';
 
 class OpenAIService {
-  async generateTrainingPlan(userAnalysis, preferences, onProgress = null) {
+  async generateTrainingPlan(userAnalysis, preferences) {
+    try {
+      const { weeksCount } = preferences;
+      
+      const WEEKS_PER_BATCH = 3;
+      const batches = Math.ceil(weeksCount / WEEKS_PER_BATCH);
+      
+      console.log(`[Ollama] Generating ${weeksCount} weeks in ${batches} batches of ${WEEKS_PER_BATCH} weeks each...`);
+      
+      let allWeeks = [];
+      let planName = '';
+      let planDescription = '';
+      
+      for (let batch = 0; batch < batches; batch++) {
+        const startWeek = batch * WEEKS_PER_BATCH + 1;
+        const endWeek = Math.min((batch + 1) * WEEKS_PER_BATCH, weeksCount);
+        const weeksInBatch = endWeek - startWeek + 1;
+        
+        console.log(`[Ollama] Batch ${batch + 1}/${batches}: Generating weeks ${startWeek}-${endWeek}...`);
+        
+        const batchPreferences = {
+          ...preferences,
+          weeksCount: weeksInBatch,
+          startWeekNumber: startWeek,
+          totalWeeksCount: weeksCount
+        };
+        
+        const batchPlan = await this.generateBatch(userAnalysis, batchPreferences);
+        
+        if (batch === 0) {
+          planName = batchPlan.planName;
+          planDescription = batchPlan.planDescription;
+        }
+        
+        allWeeks = allWeeks.concat(batchPlan.weeks);
+        
+        console.log(`[Ollama] Batch ${batch + 1} completed: ${batchPlan.weeks.length} weeks generated`);
+      }
+      
+      return {
+        planName,
+        planDescription,
+        weeks: allWeeks
+      };
+    } catch (error) {
+      console.error("Ollama API error:", error);
+      
+      if (error.code === 'ECONNREFUSED') {
+        throw new Error(
+          'Ollama is not running. Please start Ollama with: ollama serve\n' +
+          'Then make sure you have the model installed: ollama pull qwen2.5'
+        );
+      }
+      
+      throw new Error("Failed to generate training plan: " + error.message);
+    }
+  }
+
+  async generateBatch(userAnalysis, preferences) {
     try {
       const prompt = this.buildPrompt(userAnalysis, preferences);
 
       console.log('[Ollama] Generating training plan with Qwen2.5...');
-      console.log('[Ollama] This may take several minutes for a full plan...');
-
-      if (onProgress) onProgress(45, 'AI rozpoczyna generowanie planu...');
+      console.log('[Ollama] This may take a moment...');
 
       const stream = await ollamaClient.chat.completions.create({
         model: MODEL_NAME,
         messages: [
           {
             role: "system",
-            content: `You are an elite world-class running coach with deep expertise in all major endurance training systems, including Jack Daniels, Renato Canova, Patrick Sang, Arthur Lydiard, Stephen Seiler, Pfitzinger, Magness, Canaday, Hudson, Bowerman, Ingebrigtsen methodology and modern sports science. You always select the most effective combination of these systems depending on the user's exact race distance, fitness level, timeline, goal time and historical workload. You must always prioritize safe, progressive, evidence-based training.
+            content: `You generate running training plans in pure JSON format. NO markdown, NO text before or after JSON.
 
-You ALWAYS generate output STRICTLY following the JSON rules below:
-
-            STRICT JSON RULES — NEVER BREAK:
-            1. Output ONLY valid JSON — start with { and end with }.
-            2. NO markdown, NO code blocks, NO commentary outside JSON.
-            3. NO newline characters (\\n) inside any string — replace with single spaces.
-            4. NO tab characters (\\t) — only spaces.
-            5. Descriptions: maximum 1–2 sentences, single line.
-            6. All property names MUST be in double quotes.
-            7. All string values MUST be in double quotes.
-            8. No trailing commas before } or ].
-            9. Escape quotes inside strings using \\"
-            10. ALL TEXT in the JSON MUST be in Polish.
-
-            TRAINING STRUCTURE RULES — ALWAYS APPLY:
-            - Generate a COMPLETE plan with ALL requested weeks.
-            - Each week MUST have EXACTLY the number of workouts requested.
-            - Every workout MUST include:
-            "title"
-            "description"
-            "targetDistance" (km, number; only 0 on REST)
-            "targetDuration" (minutes; only 0 on REST)
-            "targetPace" ("M:SS/km" or null for REST)
-            "workoutType"
-            "intensity"
-            "intervals"
-
-            WORKOUT INTERVAL RULES:
-            - For ANY non-REST workout, "intervals" MUST be an object containing:
-                "warmup"
-                "mainSet"
-                "cooldown"
-            - For INTERVALS workouts, also include:
-                "intervals" (e.g. "5x1000m w tempie X")
-                "recovery"
-
-            REST DAY RULES:
-            - workoutType = "REST"
-            - targetDistance = 0
-            - targetDuration = 0
-            - targetPace = null
-            - intervals = null
-
-            PACE AND DURATION RULES:
-            - targetPace must be "M:SS/km" format.
-            - targetDistance must match training content.
-            - targetDuration must match targetDistance and targetPace logically.
-
-            TRAINING METHODOLOGY SELECTION:
-            - You MUST internally evaluate the user’s goal, pace, volume history, timeline and choose the optimal hybrid method (e.g., Daniels for structured intensities, Canova for marathon specific endurance, Lydiard for aerobic base, Seiler for polarized distribution, Sang for elite endurance development, Ingebrigtsen for threshold-focused progression).
-            - Always combine methods intelligently and safely for the user’s needs.
-
-            The final answer MUST be ONLY the JSON object.`,
+CRITICAL RULES:
+- Response MUST start with { and end with }
+- All text fields maximum 40 characters
+- Simple, concrete descriptions
+- Valid JSON only
+- NO comments, NO explanations
+- MANDATORY: EVERY interval field (warmup, main, cooldown) MUST include pace like "2km @ 6:00/km"
+- NEVER write just "2km" or "2km easy" - ALWAYS add "@ pace"`,
           },
           {
             role: "user",
             content: prompt,
           },
         ],
-        temperature: 0.5,
+        temperature: 0.3,
         stream: true, 
       });
 
       let content = '';
-      let lastProgress = 45;
-      let chunkCount = 0;
 
       for await (const chunk of stream) {
         const delta = chunk.choices[0]?.delta?.content || '';
         content += delta;
-        chunkCount++;
-
-        if (chunkCount % 5 === 0 && onProgress) {
-          const estimatedProgress = Math.min(85, 45 + Math.floor((content.length / 10000) * 40));
-          if (estimatedProgress > lastProgress) {
-            lastProgress = estimatedProgress;
-            onProgress(estimatedProgress, `AI generuje plan... (${Math.floor(content.length / 1000)}KB)`);
-          }
-        }
       }
 
-      if (onProgress) onProgress(85, 'AI zakończył generowanie, przetwarzanie...');
       console.log('[Ollama] Response received, parsing JSON...');
       
       console.log('[Ollama] Raw response length:', content.length);
+      console.log('[Ollama] ========== FULL RAW RESPONSE START ==========');
+      console.log(content);
+      console.log('[Ollama] ========== FULL RAW RESPONSE END ==========');
       
       const codeBlockMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
       if (codeBlockMatch) {
@@ -144,6 +146,57 @@ You ALWAYS generate output STRICTLY following the JSON rules below:
           }
         }
         
+        console.log('[Ollama] ========== ATTEMPTING PARTIAL PARSE ==========');
+        
+        let partialData = null;
+        try {
+          const weeksMatch = content.match(/"weeks"\s*:\s*\[([\s\S]*?)(?=\s*\]|\s*$)/);
+          if (weeksMatch) {
+            const weeksContent = weeksMatch[1];
+            const validWeeks = [];
+            let currentPos = 0;
+            
+            while (currentPos < weeksContent.length) {
+              const weekStart = weeksContent.indexOf('{', currentPos);
+              if (weekStart === -1) break;
+              
+              let braceCount = 1;
+              let weekEnd = weekStart + 1;
+              
+              while (weekEnd < weeksContent.length && braceCount > 0) {
+                if (weeksContent[weekEnd] === '{') braceCount++;
+                if (weeksContent[weekEnd] === '}') braceCount--;
+                weekEnd++;
+              }
+              
+              if (braceCount === 0) {
+                try {
+                  const weekJson = weeksContent.substring(weekStart, weekEnd);
+                  const week = JSON.parse(weekJson);
+                  validWeeks.push(week);
+                  console.log(`[Ollama] Extracted week ${week.weekNumber} successfully`);
+                } catch (e) {
+                  console.log(`[Ollama] Failed to parse week at position ${weekStart}`);
+                  break;
+                }
+              }
+              
+              currentPos = weekEnd;
+            }
+            
+            if (validWeeks.length > 0) {
+              partialData = {
+                planName: "Plan treningowy (częściowy)",
+                planDescription: "Plan wygenerowany częściowo z powodu błędu parsowania",
+                weeks: validWeeks
+              };
+              console.log(`[Ollama] Extracted ${validWeeks.length} valid weeks from partial data`);
+            }
+          }
+        } catch (partialError) {
+          console.error('[Ollama] Partial parse also failed:', partialError.message);
+        }
+        
         console.log('[Ollama] Attempting to fix JSON...');
         
         let fixedContent = content;
@@ -157,6 +210,44 @@ You ALWAYS generate output STRICTLY following the JSON rules below:
         fixedContent = fixedContent.replace(/,(\s*[}\]])/g, '$1');
         
         fixedContent = fixedContent.replace(/}(\s*){/g, '},\n{');
+        fixedContent = fixedContent.replace(/}(\s*)\[/g, '},\n[');
+        fixedContent = fixedContent.replace(/](\s*){/g, '],\n{');
+        
+        fixedContent = fixedContent.replace(/'/g, '"');
+        
+        fixedContent = fixedContent.replace(/\/\/.*$/gm, '');
+        fixedContent = fixedContent.replace(/\/\*[\s\S]*?\*\//g, '');
+        
+        fixedContent = fixedContent.replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":');
+        
+        fixedContent = fixedContent.replace(/}(\s*)"[a-zA-Z]/g, '},$1"');
+        
+        fixedContent = fixedContent.replace(/,,+/g, ',');
+        
+        const openBraces = (fixedContent.match(/{/g) || []).length;
+        const closeBraces = (fixedContent.match(/}/g) || []).length;
+        const openBrackets = (fixedContent.match(/\[/g) || []).length;
+        const closeBrackets = (fixedContent.match(/]/g) || []).length;
+        
+        if (openBrackets > closeBrackets) {
+          fixedContent += ']'.repeat(openBrackets - closeBrackets);
+        }
+        if (openBraces > closeBraces) {
+          fixedContent += '}'.repeat(openBraces - closeBraces);
+        }
+        
+        console.log('[Ollama] Applied', [
+          'control chars removal',
+          'newline in strings fix',
+          'trailing commas removal',
+          'missing commas addition',
+          'quotes normalization',
+          'comments removal',
+          'unquoted keys fix',
+          'array comma fix',
+          'double commas removal',
+          `bracket closure (added ${openBrackets - closeBrackets} ], ${openBraces - closeBraces} })`
+        ].join(', '));
         
         const debugPath = '/tmp/ollama_invalid_json.txt';
         try {
@@ -185,7 +276,12 @@ You ALWAYS generate output STRICTLY following the JSON rules below:
             }
           }
           
-          throw new Error('Failed to parse JSON from Ollama response: ' + parseError.message);
+          if (partialData && partialData.weeks && partialData.weeks.length > 0) {
+            console.log('[Ollama] Using partial data with', partialData.weeks.length, 'weeks');
+            planData = partialData;
+          } else {
+            throw new Error('Failed to parse JSON from Ollama response: ' + parseError.message);
+          }
         }
       }
       
@@ -232,6 +328,8 @@ You ALWAYS generate output STRICTLY following the JSON rules below:
       currentFitnessLevel,
       targetRaceDistance,
       targetRaceTime,
+      startWeekNumber = 1,
+      totalWeeksCount = weeksCount,
     } = preferences;
 
     const trainingDaysStr = trainingDays
@@ -249,117 +347,202 @@ You ALWAYS generate output STRICTLY following the JSON rules below:
       })
       .join(", ");
 
+    const progressionGuidance = this.getProgressionGuidance(totalWeeksCount, startWeekNumber, weeksCount);
+
+    const paceGuidance = this.calculateTrainingPaces(avgPace, best5kTime, best10kTime, bestHalfMarathonTime);
+
     return `
-ANALIZA UŻYTKOWNIKA:
-Średni tygodniowy kilometraż z ostatnich ${recentWeeksCount} tygodni: ${avgWeeklyDistance.toFixed(1)} km.
-Łączna liczba treningów: ${totalActivities}.
-Średnie tempo: ${avgPace || "brak danych"}.
-${best5kTime ? `Najlepszy czas na 5 km: ${this.formatTime(best5kTime)}.` : ""}
-${best10kTime ? `Najlepszy czas na 10 km: ${this.formatTime(best10kTime)}.` : ""}
-${bestHalfMarathonTime ? `Najlepszy czas na półmaraton: ${this.formatTime(bestHalfMarathonTime)}.` : ""}
+Generate ${weeksCount} weeks (weeks ${startWeekNumber}-${startWeekNumber + weeksCount - 1} of ${totalWeeksCount} total)
+Target: ${targetRaceDistance}, Level: ${currentFitnessLevel}
+Sessions: ${sessionsPerWeek}/week, Current form: ${avgWeeklyDistance.toFixed(1)}km/week
 
-CEL:
-${goal}.
-Dystans docelowy: ${targetRaceDistance}.
-Cel czasowy: ${targetRaceTime || "brak"}.
-${targetRaceDate ? `Data zawodów: ${new Date(targetRaceDate).toLocaleDateString("pl-PL")}.` : ""}
-Obecny poziom: ${currentFitnessLevel}.
+USER'S CURRENT PERFORMANCE DATA:
+${paceGuidance}
 
-PREFERENCJE:
-Plan: ${weeksCount} tygodni.
-Treningi tygodniowo: ${sessionsPerWeek}.
-Preferowane dni treningowe: ${trainingDaysStr}.
+${progressionGuidance}
 
-ZADANIE:
-Wygeneruj kompletny ${weeksCount}-tygodniowy plan treningowy biegania z dokładnie ${sessionsPerWeek} treningami na tydzień.
-
-CRITICAL: Użyj DOKŁADNIE tej struktury JSON z angielskimi nazwami pól:
-To jest przykład struktury JSON, którą MUSISZ wygenerować. Każde pole MUSI być obecne zgodnie z poniższym wzorem, ale plan jest przykladowy i MUSI być dostosowany do analizy użytkownika i preferencji.
+REQUIRED JSON FORMAT:
 {
-  "planName": "Nazwa planu treningowego",
-  "planDescription": "Krótki opis strategii planu",
-  "weeks": [
-    {
-      "weekNumber": 1,
-      "weekGoal": "Cel tygodnia (np. 'Tydzień bazowy')",
-      "totalDistance": 30.0,
-      "totalDuration": 180,
-      "workouts": [
-        {
-          "dayOfWeek": 1,
-          "workoutType": "EASY_RUN",
-          "name": "Bieg regeneracyjny",
-          "description": "Opis treningu po polsku",
-          "targetDistance": 8.0,
-          "targetDuration": 48,
-          "targetPace": "6:00/km",
-          "intensity": "Easy",
-          "intervals": null
-        },
-        {
-          "dayOfWeek": 3,
-          "workoutType": "INTERVALS",
-          "name": "Interwały 5x1000m",
-          "description": "Opis treningu",
-          "targetDistance": 10.0,
-          "targetDuration": 60,
-          "targetPace": "4:30/km",
-          "intensity": "Hard",
-          "intervals": {
-            "warmup": "2km w tempie easy",
-            "intervals": "5x1000m w tempie 4:30/km",
-            "recovery": "400m trucht między interwałami",
-            "cooldown": "2km w tempie easy"
-          }
-        }
-      ]
-    }
-  ]
+  "planName": "${targetRaceDistance} Training Plan",
+  "planDescription": "Max 60 characters",
+  "weeks": [{
+    "weekNumber": ${startWeekNumber},
+    "weekGoal": "Max 40 characters",
+    "totalDistance": 35,
+    "totalDuration": 210,
+    "workouts": [{
+      "dayOfWeek": 1,
+      "workoutType": "EASY_RUN",
+      "name": "Easy 8km",
+      "description": "Easy recovery run",
+      "targetDistance": 8,
+      "targetDuration": 48,
+      "targetPace": "6:00/km",
+      "intensity": "Easy",
+      "intervals": {"warmup":"1.5km @ 6:15/km","main":"5km @ 6:00/km","cooldown":"1.5km @ 6:15/km"}
+    },{
+      "dayOfWeek": 3,
+      "workoutType": "INTERVALS",
+      "name": "8x400m",
+      "description": "Fast 400m intervals",
+      "targetDistance": 9,
+      "targetDuration": 50,
+      "targetPace": "4:30/km",
+      "intensity": "Hard",
+      "intervals": {"warmup":"2km @ 6:00/km","main":"8x400m @ 4:20/km w/ 200m jog","cooldown":"1.5km @ 6:00/km"}
+    },{
+      "dayOfWeek": 6,
+      "workoutType": "LONG_RUN",
+      "name": "Long 16km",
+      "description": "Endurance building",
+      "targetDistance": 16,
+      "targetDuration": 96,
+      "targetPace": "6:00/km",
+      "intensity": "Easy",
+      "intervals": {"warmup":"2km @ 6:15/km","main":"12km @ 6:00/km","cooldown":"2km @ 6:15/km"}
+    }]
+  }]
 }
 
-WAŻNE REGUŁY:
-1. Nazwy pól MUSZĄ być po angielsku: "planName", "weeks", "workouts", "dayOfWeek", etc.
-2. Wartości tekstowe (name, description) MUSZĄ być po polsku
-3. workoutType: EASY_RUN, LONG_RUN, TEMPO_RUN, INTERVALS, FARTLEK, RECOVERY, RACE_PACE, REST
-4. intensity: Easy, Moderate, Hard, Very Hard
-5. targetDistance w kilometrach (np. 8.0, 10.5, 15.0) - nigdy 0 chyba że REST
-6. targetDuration w minutach (np. 45, 60, 90) - nigdy 0 lub 1 chyba że REST
-7. targetPace format: "X:XX/km" (np. "5:30/km", "6:00/km")
+WORKOUT TYPES: EASY_RUN, LONG_RUN, TEMPO_RUN, INTERVALS, REST
+INTENSITY LEVELS: Easy, Moderate, Hard
 
-KRYTYCZNE - OBLICZANIE CZASU:
-- targetDuration MUSI być obliczony jako: targetDistance (km) × pace (min/km)
-- Przykład: 10km × 5:30/km = 10 × 5.5 = 55 minut
-- Przykład: 4.5km × 4:15/km = 4.5 × 4.25 = 19 minut (NIE 37!)
-- ZAWSZE sprawdź matematykę: dystans × tempo = czas
+CRITICAL RULES:
+- Week numbers: ${startWeekNumber} to ${startWeekNumber + weeksCount - 1}
+- Each week must have DIFFERENT distance and intensity
+- All descriptions max 40 characters
+- EVERY workout MUST have intervals structure with: warmup, main, cooldown
+- ⚠️ MANDATORY: Include pace in ALL parts - EXAMPLES:
+  ✓ CORRECT: "2km @ 6:00/km", "8x400m @ 4:20/km w/ 200m jog", "12km @ 5:30/km"
+  ✗ WRONG: "2km easy", "12km steady", "2km" (missing pace!)
+- For INTERVALS: "8x400m @ 4:20/km w/ 200m jog" or "5x1000m @ 4:50/km w/ 400m rec"
+- For continuous runs: "10km @ 5:30/km" or "8km @ 5:25/km (HM pace)"
+- Warmup/cooldown: add "@ X:XX/km" (10-15sec/km slower than main)
+- REST workouts: distance=0, duration=0, pace=null, intervals=null (no structure)
+- Generate ${sessionsPerWeek} workouts per week
+- Use training days: ${trainingDaysStr}
+- IMPORTANT: Use ONLY the paces from USER'S CURRENT PERFORMANCE DATA above
+- Calculate targetDuration based on targetDistance and targetPace
 
-KRYTYCZNE - TRENINGI INTERWAŁOWE:
-- Dla workoutType: "INTERVALS" ZAWSZE dodaj obiekt "intervals"
-- "intervals" MUSI zawierać: warmup, intervals, recovery, cooldown
-- W polu "name" umieść dokładną specyfikację (np. "Interwały 5x1000m", "Interwały 8x400m")
-- W polu "intervals.intervals" podaj DOKŁADNIE tę samą specyfikację co w "name"
-- Przykład:
-  {
-    "name": "Interwały 2x800m",
-    "workoutType": "INTERVALS",
-    "intervals": {
-      "warmup": "2km w tempie easy",
-      "intervals": "2x800m w tempie 4:15/km",
-      "recovery": "400m trucht między powtórkami",
-      "cooldown": "1.5km w tempie easy"
-    }
+⚠️ REMEMBER: NO part should say just "easy" or "steady" - ALWAYS add "@ X:XX/km"
+
+OUTPUT ONLY VALID JSON!
+`;
   }
 
-OPISY TRENINGÓW:
-- description MUSI być dokładny i kompletny
-- Dla interwałów: opisz rozgrzewkę, główną część, przerwy i wyciszenie
-- Dla biegów długich: opisz tempo, nawodnienie, progresję
-- Dla tempo run: opisz strefę tętna, tempo docelowe
-- Użyj fachowej terminologii biegowej po polsku
+  calculateTrainingPaces(avgPace, best5kTime, best10kTime, bestHalfMarathonTime) {
+    const secondsToPace = (totalSeconds, distance) => {
+      if (!totalSeconds || !distance) return null;
+      const paceSeconds = totalSeconds / distance;
+      const minutes = Math.floor(paceSeconds / 60);
+      const seconds = Math.round(paceSeconds % 60);
+      return `${minutes}:${seconds.toString().padStart(2, '0')}/km`;
+    };
 
-Wygeneruj WSZYSTKIE ${weeksCount} tygodnie, każdy z ${sessionsPerWeek} treningami.
+    const paceToSeconds = (paceStr) => {
+      if (!paceStr) return null;
+      const match = paceStr.match(/(\d+):(\d+)/);
+      if (!match) return null;
+      return parseInt(match[1]) * 60 + parseInt(match[2]);
+    };
 
-Zwróć TYLKO JSON, bez komentarzy.
-`;
+    let guidance = '';
+    
+    const easyPaceSeconds = avgPace ? paceToSeconds(avgPace) : null;
+    const easyPace = avgPace || '6:00/km';
+    guidance += `Easy/Recovery pace: ${easyPace} (current average pace)\n`;
+
+    if (best5kTime) {
+      const pace5k = secondsToPace(best5kTime, 5);
+      guidance += `5K race pace: ${pace5k} (from best 5K: ${this.formatTime(best5kTime)})\n`;
+      
+      const intervalPaceSeconds = (best5kTime / 5) - 5; 
+      const intervalMin = Math.floor(intervalPaceSeconds / 60);
+      const intervalSec = Math.round(intervalPaceSeconds % 60);
+      guidance += `Interval pace (400m-800m): ${intervalMin}:${intervalSec.toString().padStart(2, '0')}/km (5K pace - 5sec)\n`;
+    }
+
+    if (best10kTime) {
+      const pace10k = secondsToPace(best10kTime, 10);
+      guidance += `10K race pace: ${pace10k} (from best 10K: ${this.formatTime(best10kTime)})\n`;
+      guidance += `Tempo/Threshold pace: ${pace10k} (use for 1000m-2000m intervals)\n`;
+    }
+
+    if (bestHalfMarathonTime) {
+      const paceHM = secondsToPace(bestHalfMarathonTime, 21.0975);
+      guidance += `Half-Marathon pace: ${paceHM} (from best HM: ${this.formatTime(bestHalfMarathonTime)})\n`;
+      guidance += `Tempo run pace: ${paceHM} (use for tempo runs 8-15km)\n`;
+    }
+
+    if (bestHalfMarathonTime) {
+      const marathonPaceSeconds = (bestHalfMarathonTime / 21.0975) + 20; 
+      const marathonMin = Math.floor(marathonPaceSeconds / 60);
+      const marathonSec = Math.round(marathonPaceSeconds % 60);
+      guidance += `Marathon pace (estimated): ${marathonMin}:${marathonSec.toString().padStart(2, '0')}/km (HM pace + 20sec)\n`;
+    } else if (best10kTime) {
+      const marathonPaceSeconds = (best10kTime / 10) + 30; 
+      const marathonMin = Math.floor(marathonPaceSeconds / 60);
+      const marathonSec = Math.round(marathonPaceSeconds % 60);
+      guidance += `Marathon pace (estimated): ${marathonMin}:${marathonSec.toString().padStart(2, '0')}/km (10K pace + 30sec)\n`;
+    }
+
+    if (easyPaceSeconds) {
+      const easyPlusSeconds = easyPaceSeconds + 10; 
+      const easyPlusMin = Math.floor(easyPlusSeconds / 60);
+      const easyPlusSec = Math.round(easyPlusSeconds % 60);
+      guidance += `Long run pace: ${easyPlusMin}:${easyPlusSec.toString().padStart(2, '0')}/km (easy pace + 10-15sec)\n`;
+    }
+
+    guidance += '\nIMPORTANT: Use THESE EXACT PACES in your workouts. Do NOT make up different paces.\n';
+    
+    return guidance;
+  }
+
+  getProgressionGuidance(totalWeeks, startWeek, batchSize) {
+    const endWeek = Math.min(startWeek + batchSize - 1, totalWeeks);
+    
+    let guidance = 'PROGRESSION PLAN (CHALLENGING WORKOUTS):\n';
+    
+    for (let week = startWeek; week <= endWeek; week++) {
+      if (week <= 3) {
+        const weeklyKm = 45 + week * 3;
+        guidance += `Week ${week}: BASE BUILDING ${weeklyKm}-${weeklyKm + 5}km (65% Easy, 10% Moderate)\n`;
+        guidance += `  Intervals: ${week === 1 ? '10x400m @ 5K pace' : week === 2 ? '8x600m @ 5K pace' : '6x800m @ 5K pace'}\n`;
+        guidance += `  Tempo run: ${6 + week}km @ half-marathon pace\n`;
+        guidance += `  Long run: ${16 + week * 2}km @ easy+10-15sec\n`;
+      } else if (week === 4) {
+        guidance += `Week ${week}: RECOVERY 35-38km (-20% volume)\n`;
+        guidance += `  Intervals: 8x400m @ 5K pace (reduced reps)\n`;
+        guidance += `  Tempo: 6km @ half-marathon pace\n`;
+        guidance += `  Long run: 14km easy\n`;
+      } else if (week <= 8) {
+        const weeklyKm = 50 + (week - 4) * 4;
+        guidance += `Week ${week}: BUILD PHASE ${weeklyKm}-${weeklyKm + 6}km (55% Easy, 25% Moderate, 20% Hard)\n`;
+        if (week === 5) guidance += `  Intervals: 6x1000m @ 10K pace, Tempo: 10km @ half-marathon pace\n`;
+        else if (week === 6) guidance += `  Intervals: 5x1200m @ 10K pace, Tempo: 12km @ half-marathon pace\n`;
+        else if (week === 7) guidance += `  Intervals: 4x1600m @ 10K pace, Tempo: 13km @ marathon pace\n`;
+        else guidance += `  Intervals: 3x2000m @ 10K pace, Tempo: 14km @ marathon pace\n`;
+        guidance += `  Long run: ${18 + (week - 4) * 2}km with last 5km @ marathon pace\n`;
+      } else if (week === 9) {
+        guidance += `Week ${week}: RECOVERY 40-43km (-20% volume)\n`;
+        guidance += `  Intervals: 8x600m @ 5K pace (sharp but short)\n`;
+        guidance += `  Tempo: 8km @ half-marathon pace\n`;
+        guidance += `  Long run: 16km easy\n`;
+      } else if (week <= 11) {
+        const weeklyKm = 65 + (week - 9) * 5;
+        guidance += `Week ${week}: PEAK PHASE ${weeklyKm}-${weeklyKm + 5}km (50% Easy, 30% Hard, 20% Moderate)\n`;
+        if (week === 10) guidance += `  Intervals: 4x2000m @ 10K pace, Tempo: 15km @ half-marathon pace\n`;
+        else guidance += `  Intervals: 3x3000m @ 10K-15K pace, Tempo: 16km @ marathon pace\n`;
+        guidance += `  Long run: ${22 + (week - 10) * 3}km with progressive pace (last 8km @ marathon pace)\n`;
+      } else {
+        guidance += `Week ${week}: TAPER 35-40km (-45% volume, maintain intensity)\n`;
+        guidance += `  Intervals: 8x400m @ 5K pace (sharp, short)\n`;
+        guidance += `  Tempo: 6km @ half-marathon pace\n`;
+        guidance += `  Long run: 12km easy (fresh legs for race)\n`;
+      }
+    }
+    
+    return guidance.trim();
   }
 
   formatTime(seconds) {

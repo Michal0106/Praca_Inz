@@ -1,6 +1,175 @@
 import prisma from "../config/database.js";
 import { getUserId } from "../utils/auth.utils.js";
 import { openaiService } from "../services/openai.service.js";
+import * as googleService from "../services/google.service.js";
+
+const calculateWorkoutDuration = (intervals, targetDistance, targetPace) => {
+  if (!intervals) return null;
+  
+  try {
+    const intervalsData = typeof intervals === 'string' ? JSON.parse(intervals) : intervals;
+    let totalMinutes = 0;
+    
+    const parsePace = (paceStr) => {
+      if (!paceStr) return null;
+      const match = paceStr.match(/(\d+):(\d+)/);
+      if (!match) return null;
+      return parseInt(match[1]) + parseInt(match[2]) / 60;
+    };
+    
+    const parseDistance = (distStr) => {
+      if (!distStr) return 0;
+      const kmMatch = distStr.match(/(\d+(?:\.\d+)?)\s*km/i);
+      if (kmMatch) return parseFloat(kmMatch[1]);
+      const mMatch = distStr.match(/(\d+)\s*m/i);
+      if (mMatch) return parseFloat(mMatch[1]) / 1000;
+      return 0;
+    };
+    
+    const basePace = parsePace(targetPace) || 6; 
+    
+    if (intervalsData.warmup) {
+      const distance = parseDistance(intervalsData.warmup);
+      const paceMatch = intervalsData.warmup.match(/@\s*([\d:]+)/);
+      const pace = paceMatch ? parsePace(paceMatch[1]) : basePace * 1.15; 
+      totalMinutes += distance * pace;
+    }
+    
+    if (intervalsData.main) {
+      const intervalMatch = intervalsData.main.match(/(\d+)x(\d+)\s*m/);
+      if (intervalMatch) {
+        const reps = parseInt(intervalMatch[1]);
+        const distanceKm = parseInt(intervalMatch[2]) / 1000;
+        const paceMatch = intervalsData.main.match(/@\s*([\d:]+)/);
+        const pace = paceMatch ? parsePace(paceMatch[1]) : basePace * 0.85;
+        const intervalTime = reps * distanceKm * pace;
+        
+        const recoveryMatch = intervalsData.main.match(/w\/\s*(\d+)\s*m/);
+        if (recoveryMatch) {
+          const recoveryKm = parseInt(recoveryMatch[1]) / 1000;
+          const recoveryPace = basePace * 1.5; 
+          const recoveryTime = (reps - 1) * recoveryKm * recoveryPace; 
+          totalMinutes += intervalTime + recoveryTime;
+        } else {
+          const recoveryTime = (reps - 1) * 1.5; 
+          totalMinutes += intervalTime + recoveryTime;
+        }
+      } else {
+        const segments = intervalsData.main.split('+').map(s => s.trim());
+        
+        for (const segment of segments) {
+          const distance = parseDistance(segment);
+          const paceMatch = segment.match(/@\s*([\d:]+)/);
+          const pace = paceMatch ? parsePace(paceMatch[1]) : basePace;
+          totalMinutes += distance * pace;
+        }
+      }
+    }
+    
+    if (intervalsData.intervals) {
+      const repsMatch = intervalsData.intervals.match(/(\d+)x/);
+      const distanceMatch = intervalsData.intervals.match(/(\d+)\s*m/);
+      const paceMatch = intervalsData.intervals.match(/@\s*([\d:]+)/);
+      
+      if (repsMatch && distanceMatch) {
+        const reps = parseInt(repsMatch[1]);
+        const distanceKm = parseInt(distanceMatch[1]) / 1000;
+        const pace = paceMatch ? parsePace(paceMatch[1]) : basePace * 0.85;
+        const intervalTime = reps * distanceKm * pace;
+        
+        const recoveryTime = (reps - 1) * 1.5;
+        totalMinutes += intervalTime + recoveryTime;
+      }
+    }
+    
+    if (intervalsData.recovery) {
+      const distance = parseDistance(intervalsData.recovery);
+      const paceMatch = intervalsData.recovery.match(/@\s*([\d:]+)/);
+      const pace = paceMatch ? parsePace(paceMatch[1]) : basePace * 1.2; 
+      totalMinutes += distance * pace;
+    }
+    
+    if (intervalsData.cooldown) {
+      const distance = parseDistance(intervalsData.cooldown);
+      const paceMatch = intervalsData.cooldown.match(/@\s*([\d:]+)/);
+      const pace = paceMatch ? parsePace(paceMatch[1]) : basePace * 1.15; 
+      totalMinutes += distance * pace;
+    }
+    
+    return totalMinutes > 0 ? Math.round(totalMinutes) : null;
+  } catch (e) {
+    console.error('[Duration Calc] Error:', e);
+    return null;
+  }
+};
+
+const calculateTotalDistance = (intervals) => {
+  if (!intervals) return null;
+  
+  try {
+    const intervalsData = typeof intervals === 'string' ? JSON.parse(intervals) : intervals;
+    let totalKm = 0;
+    
+    const parseDistance = (distStr) => {
+      if (!distStr) return 0;
+      const kmMatch = distStr.match(/(\d+(?:\.\d+)?)\s*km/i);
+      if (kmMatch) return parseFloat(kmMatch[1]);
+      const mMatch = distStr.match(/(\d+)\s*m/i);
+      if (mMatch) return parseFloat(mMatch[1]) / 1000;
+      return 0;
+    };
+    
+    if (intervalsData.warmup) {
+      totalKm += parseDistance(intervalsData.warmup);
+    }
+    
+    
+    if (intervalsData.main) {
+      const intervalMatch = intervalsData.main.match(/(\d+)x(\d+)\s*m/);
+      if (intervalMatch) {
+        const reps = parseInt(intervalMatch[1]);
+        const distanceKm = parseInt(intervalMatch[2]) / 1000;
+        totalKm += reps * distanceKm;
+        
+        const recoveryMatch = intervalsData.main.match(/w\/\s*(\d+)\s*m/);
+        if (recoveryMatch) {
+          const recoveryKm = parseInt(recoveryMatch[1]) / 1000;
+          totalKm += (reps - 1) * recoveryKm; 
+        }
+      } else {
+        const segments = intervalsData.main.split('+').map(s => s.trim());
+        
+        for (const segment of segments) {
+          totalKm += parseDistance(segment);
+        }
+      }
+    }
+    
+    if (intervalsData.intervals) {
+      const repsMatch = intervalsData.intervals.match(/(\d+)x/);
+      const distanceMatch = intervalsData.intervals.match(/(\d+)\s*m/);
+      
+      if (repsMatch && distanceMatch) {
+        const reps = parseInt(repsMatch[1]);
+        const distanceKm = parseInt(distanceMatch[1]) / 1000;
+        totalKm += reps * distanceKm;
+      }
+    }
+    
+    if (intervalsData.recovery) {
+      totalKm += parseDistance(intervalsData.recovery);
+    }
+    
+    if (intervalsData.cooldown) {
+      totalKm += parseDistance(intervalsData.cooldown);
+    }
+    
+    return totalKm > 0 ? totalKm : null;
+  } catch (e) {
+    console.error('[Distance Calc] Error:', e);
+    return null;
+  }
+};
 
 const validateAndFixWorkout = (workout) => {
   console.log('[Validate] BEFORE:', {
@@ -100,6 +269,34 @@ const validateAndFixWorkout = (workout) => {
       fixed.targetDuration = expectedDuration;
       console.log(`[Validate] Corrected duration to ${expectedDuration}min`);
     }
+  }
+
+  if (fixed.intervals && fixed.workoutType !== 'REST') {
+    const calculatedDistance = calculateTotalDistance(fixed.intervals);
+    if (calculatedDistance && calculatedDistance > 0) {
+      fixed.targetDistance = calculatedDistance;
+      console.log(`[Validate] Calculated distance from intervals: ${calculatedDistance}km`);
+    }
+    
+    const calculatedDuration = calculateWorkoutDuration(fixed.intervals, fixed.targetDistance, fixed.targetPace);
+    if (calculatedDuration && calculatedDuration > 0) {
+      fixed.targetDuration = calculatedDuration;
+      console.log(`[Validate] Calculated duration from intervals: ${calculatedDuration}min`);
+    }
+  }
+  
+  if (fixed.workoutType !== 'REST') {
+    let baseName = fixed.name.replace(/\s*\d+(?:\.\d+)?km/, '').replace(/\s*\(\d+min\)\s*$/, '').trim();
+    
+    if (fixed.targetDistance > 0) {
+      const distanceKm = Math.round(fixed.targetDistance * 10) / 10; 
+      baseName = `${baseName} ${distanceKm}km`;
+    }
+    if (fixed.targetDuration > 0) {
+      baseName = `${baseName} (${fixed.targetDuration}min)`;
+    }
+    
+    fixed.name = baseName;
   }
 
   console.log('[Validate] AFTER:', {
@@ -372,10 +569,7 @@ export const generateTrainingPlanSSE = async (req, res) => {
 
     const generatedPlan = await openaiService.generateTrainingPlan(
       userAnalysis,
-      preferences,
-      (progress, message) => {
-        sendProgress(progress, message);
-      }
+      preferences
     );
 
     sendProgress(90, 'Walidacja i optymalizacja planu...');
@@ -564,7 +758,6 @@ export const generateTrainingPlan = async (req, res) => {
 
     console.log('[Generate Plan] Preferences:', preferences);
 
-    // Generuj plan przez Ollama/Qwen2.5
     console.log('[Generate Plan] Calling Ollama to generate plan...');
     const generatedPlan = await openaiService.generateTrainingPlan(
       userAnalysis,
@@ -572,6 +765,21 @@ export const generateTrainingPlan = async (req, res) => {
     );
 
     console.log('[Generate Plan] Plan generated successfully, validating data...');
+    console.log('[Generate Plan] Generated plan structure:', {
+      planName: generatedPlan.planName,
+      planDescription: generatedPlan.planDescription,
+      weeksCount: generatedPlan.weeks?.length,
+      firstWeek: generatedPlan.weeks?.[0] ? {
+        weekNumber: generatedPlan.weeks[0].weekNumber,
+        weekGoal: generatedPlan.weeks[0].weekGoal,
+        workoutsCount: generatedPlan.weeks[0].workouts?.length
+      } : null,
+      lastWeek: generatedPlan.weeks?.[generatedPlan.weeks.length - 1] ? {
+        weekNumber: generatedPlan.weeks[generatedPlan.weeks.length - 1].weekNumber,
+        weekGoal: generatedPlan.weeks[generatedPlan.weeks.length - 1].weekGoal,
+        workoutsCount: generatedPlan.weeks[generatedPlan.weeks.length - 1].workouts?.length
+      } : null
+    });
 
     const validatedWeeks = generatedPlan.weeks.map((week) => ({
       ...week,
@@ -800,17 +1008,61 @@ export const deleteTrainingPlan = async (req, res) => {
         id: planId,
         userId,
       },
+      include: {
+        weeks: {
+          include: {
+            workouts: true,
+          },
+        },
+      },
     });
 
     if (!plan) {
       return res.status(404).json({ error: "Training plan not found" });
     }
 
+    if (plan.syncedToCalendar) {
+      console.log(`[Delete Plan] Plan was synced to calendar, removing events...`);
+      
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { googleRefreshToken: true },
+      });
+
+      if (user?.googleRefreshToken) {
+        let deletedCount = 0;
+        let failedCount = 0;
+
+        const allWorkouts = plan.weeks.flatMap(week => week.workouts);
+        const workoutsWithEvents = allWorkouts.filter(w => w.googleEventId);
+
+        console.log(`[Delete Plan] Found ${workoutsWithEvents.length} workouts with calendar events`);
+
+        for (const workout of workoutsWithEvents) {
+          try {
+            await googleService.deleteCalendarEvent(userId, workout.googleEventId);
+            deletedCount++;
+            console.log(`[Delete Plan] Deleted event for workout: ${workout.name}`);
+          } catch (error) {
+            failedCount++;
+            console.error(`[Delete Plan] Failed to delete event for ${workout.name}:`, error.message);
+          }
+        }
+
+        console.log(`[Delete Plan] Calendar cleanup: ${deletedCount} deleted, ${failedCount} failed`);
+      } else {
+        console.log(`[Delete Plan] User doesn't have Google Calendar connected, skipping event deletion`);
+      }
+    }
+
     await prisma.trainingPlan.delete({
       where: { id: planId },
     });
 
-    res.json({ message: "Training plan deleted successfully" });
+    res.json({ 
+      message: "Training plan deleted successfully",
+      calendarEventsDeleted: plan.syncedToCalendar,
+    });
   } catch (error) {
     console.error("Delete training plan error:", error);
     res.status(500).json({ error: "Failed to delete training plan" });
@@ -1104,5 +1356,167 @@ export const getSessionById = async (req, res) => {
   } catch (error) {
     console.error("Get session by id error:", error);
     res.status(500).json({ error: "Failed to fetch session details" });
+  }
+};
+
+
+export const syncPlanToCalendar = async (req, res) => {
+  try {
+    const { id: planId } = req.params;
+    const userId = getUserId(req);
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { googleRefreshToken: true },
+    });
+
+    if (!user?.googleRefreshToken) {
+      return res.status(400).json({ 
+        error: 'Google Calendar not connected',
+        requiresGoogleAuth: true,
+      });
+    }
+
+    const plan = await prisma.trainingPlan.findFirst({
+      where: { id: planId, userId },
+      include: {
+        weeks: {
+          include: {
+            workouts: true,
+          },
+          orderBy: { weekNumber: 'asc' },
+        },
+      },
+    });
+
+    if (!plan) {
+      return res.status(404).json({ error: 'Training plan not found' });
+    }
+
+    let eventsCreated = 0;
+    let eventsUpdated = 0;
+    const errors = [];
+
+    let startDate;
+    if (plan.targetRaceDate) {
+      startDate = new Date(plan.targetRaceDate);
+      startDate.setDate(startDate.getDate() - (plan.weeksCount * 7));
+    } else {
+      startDate = new Date();
+      const dayOfWeek = startDate.getDay();
+      const daysUntilMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek) % 7;
+      startDate.setDate(startDate.getDate() + daysUntilMonday);
+    }
+
+    for (const week of plan.weeks) {
+      for (const workout of week.workouts) {
+        if (workout.workoutType === 'REST') {
+          continue; 
+        }
+
+        try {
+          const workoutDate = new Date(startDate);
+          workoutDate.setDate(workoutDate.getDate() + ((week.weekNumber - 1) * 7) + (workout.dayOfWeek - 1));
+
+          workoutDate.setHours(8, 0, 0, 0);
+
+          const durationHours = workout.targetDuration ? workout.targetDuration / 60 : 1;
+          const endDate = new Date(workoutDate);
+          endDate.setHours(endDate.getHours() + durationHours);
+
+          let description = workout.description || '';
+          
+          if (workout.targetDistance) {
+            description += `\n\n📏 Dystans: ${workout.targetDistance.toFixed(1)} km`;
+          }
+          if (workout.targetDuration) {
+            description += `\n⏱️ Czas: ${workout.targetDuration} min`;
+          }
+          if (workout.targetPace) {
+            description += `\n🎯 Tempo: ${workout.targetPace}`;
+          }
+          if (workout.intensity) {
+            description += `\n💪 Intensywność: ${workout.intensity}`;
+          }
+
+          if (workout.intervals) {
+            try {
+              const intervals = typeof workout.intervals === 'string' 
+                ? JSON.parse(workout.intervals) 
+                : workout.intervals;
+              
+              description += '\n\n📊 Struktura treningu:';
+              if (intervals.warmup) description += `\n• Rozgrzewka: ${intervals.warmup}`;
+              if (intervals.main) description += `\n• Część główna: ${intervals.main}`;
+              if (intervals.intervals) description += `\n• Interwały: ${intervals.intervals}`;
+              if (intervals.recovery) description += `\n• Odzyskiwanie: ${intervals.recovery}`;
+              if (intervals.cooldown) description += `\n• Wyciszenie: ${intervals.cooldown}`;
+            } catch (e) {
+              console.error('Error parsing intervals:', e);
+            }
+          }
+
+          const eventData = {
+            summary: `🏃 ${workout.name}`,
+            description: description.trim(),
+            startTime: workoutDate.toISOString(),
+            endTime: endDate.toISOString(),
+          };
+
+          if (workout.googleEventId) {
+            try {
+              await googleService.updateCalendarEvent(userId, workout.googleEventId, eventData);
+              eventsUpdated++;
+            } catch (updateError) {
+              const event = await googleService.createCalendarEvent(userId, eventData);
+              await prisma.planWorkout.update({
+                where: { id: workout.id },
+                data: { googleEventId: event.id },
+              });
+              eventsCreated++;
+            }
+          } else {
+            const event = await googleService.createCalendarEvent(userId, eventData);
+            await prisma.planWorkout.update({
+              where: { id: workout.id },
+              data: { googleEventId: event.id },
+            });
+            eventsCreated++;
+          }
+        } catch (error) {
+          console.error(`Error syncing workout ${workout.id} (${workout.name}):`, error);
+          console.error('Error details:', {
+            message: error.message,
+            response: error.response?.data,
+            status: error.response?.status,
+          });
+          errors.push({
+            workoutId: workout.id,
+            workoutName: workout.name,
+            error: error.message,
+            details: error.response?.data || error.stack,
+          });
+        }
+      }
+    }
+
+    await prisma.trainingPlan.update({
+      where: { id: planId },
+      data: {
+        syncedToCalendar: true,
+        calendarSyncDate: new Date(),
+      },
+    });
+
+    res.json({
+      message: 'Training plan synced to Google Calendar',
+      eventsCreated,
+      eventsUpdated,
+      totalEvents: eventsCreated + eventsUpdated,
+      errors: errors.length > 0 ? errors : undefined,
+    });
+  } catch (error) {
+    console.error('Error syncing plan to calendar:', error);
+    res.status(500).json({ error: 'Failed to sync training plan to calendar' });
   }
 };

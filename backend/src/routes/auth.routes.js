@@ -10,6 +10,9 @@ import {
   unlinkStrava,
   requestPasswordReset,
   resetPassword,
+  googleAuth,
+  googleCallback,
+  unlinkGoogle,
 } from "../controllers/auth.controller.js";
 import {
   authenticateJWT,
@@ -27,6 +30,10 @@ router.get("/me", authenticateJWT, getCurrentUser);
 router.get("/strava", optionalAuthenticateJWT, stravaAuth);
 router.get("/strava/callback", optionalAuthenticateJWT, stravaCallback);
 router.post("/strava/unlink", authenticateJWT, unlinkStrava);
+
+router.get("/google", authenticateJWT, googleAuth);
+router.get("/google/callback", optionalAuthenticateJWT, googleCallback);
+router.post("/google/unlink", authenticateJWT, unlinkGoogle);
 
 router.post("/forgot-password", requestPasswordReset);
 router.post("/reset-password", resetPassword);

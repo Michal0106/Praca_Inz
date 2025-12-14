@@ -65,6 +65,17 @@ function BestEffortsPage() {
     }
   };
 
+  const handleRefreshActivity = async () => {
+    if (selectedActivity) {
+      try {
+        const res = await activitiesAPI.getActivityById(selectedActivity.id);
+        setSelectedActivity(res.data.activity);
+      } catch (error) {
+        console.error("Refresh activity error:", error);
+      }
+    }
+  };
+
   const formatEffortTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -167,6 +178,7 @@ function BestEffortsPage() {
         {showModal && (
           <ActivityModal
             activity={selectedActivity}
+            onRefresh={handleRefreshActivity}
             onClose={() => {
               setShowModal(false);
               setSelectedActivity(null);
