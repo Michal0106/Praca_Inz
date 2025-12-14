@@ -1,6 +1,5 @@
 import OpenAI from "openai";
 
-// Test połączenia z Ollama
 async function testOllama() {
   console.log("=== TEST OLLAMA CONNECTION ===\n");
 
@@ -37,7 +36,6 @@ async function testOllama() {
     const content = completion.choices[0].message.content;
     console.log(content);
 
-    // Try to parse as JSON
     console.log("\n3. Testing JSON parsing...");
     try {
       const jsonMatch = content.match(/\{[\s\S]*\}/);

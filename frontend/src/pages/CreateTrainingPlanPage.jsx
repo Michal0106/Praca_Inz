@@ -558,14 +558,6 @@ function CreateTrainingPlanPage() {
                 <Loader size={20} className="spin" />
                 <span className="progress-message">{generatingMessage}</span>
               </div>
-              <div className="progress-bar-wrapper">
-                <div 
-                  className="progress-bar-fill" 
-                  style={{ width: `${generatingProgress}%` }}
-                >
-                  <span className="progress-percentage">{generatingProgress}%</span>
-                </div>
-              </div>
             </div>
           )}
 

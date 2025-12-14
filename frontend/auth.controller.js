@@ -265,7 +265,6 @@ export const getCurrentUser = async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    // Ukryj dummy email od Strava
     const isStravaEmail = user.email && user.email.includes('@strava.local');
     const displayEmail = isStravaEmail ? null : user.email;
 
@@ -333,8 +332,6 @@ export const stravaCallback = async (req, res) => {
     const emailSafe = athlete.email || `strava_${stravaId}@strava.local`;
 
 
-    // 1)pinned to account
-
     if (mode === "connect") {
       const userId = stateData.userId;
 
@@ -354,21 +351,17 @@ export const stravaCallback = async (req, res) => {
         },
       });
 
-      // Automatyczna synchronizacja aktywności po połączeniu
       try {
         console.log(`Starting automatic sync for user ${userId} after Strava connection...`);
         await syncStravaActivities(userId, access_token);
         console.log(`Automatic sync completed for user ${userId}`);
       } catch (syncError) {
         console.error('Auto-sync error:', syncError);
-        // Nie przerywamy procesu - sync można wykonać później ręcznie
       }
 
       return res.redirect(`${process.env.CLIENT_URL}/account?strava=linked`);
     }
 
-
-    // 2)logging through strava
 
     let user = await prisma.user.findUnique({
       where: { stravaId },
@@ -390,7 +383,6 @@ export const stravaCallback = async (req, res) => {
         },
       });
       
-      // Automatyczna synchronizacja dla nowego użytkownika
       try {
         console.log(`Starting automatic sync for new user ${user.id}...`);
         await syncStravaActivities(user.id, access_token);
@@ -414,8 +406,6 @@ export const stravaCallback = async (req, res) => {
 
 
 
-
-    // tokens
     req.session = null;
 
     const jwtAccess = jwtService.generateAccessToken(user.id);
@@ -458,7 +448,6 @@ export const unlinkStrava = async (req, res) => {
   }
 };
 
-// Funkcja pomocnicza do synchronizacji aktywności ze Stravą
 async function syncStravaActivities(userId, accessToken) {
   try {
     console.log(`Fetching activities from Strava for user ${userId}...`);
@@ -507,7 +496,6 @@ async function syncStravaActivities(userId, accessToken) {
       }
     }
 
-    // Aktualizacja statystyk użytkownika
     const activities = await prisma.activity.findMany({
       where: { userId },
       select: {

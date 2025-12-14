@@ -9,9 +9,10 @@ import {
   Circle,
   ChevronDown,
   ChevronUp,
+  CalendarPlus,
 } from "lucide-react";
 import Layout from "../components/Layout";
-import { trainingPlanAPI } from "../services/api";
+import { trainingPlanAPI, authAPI } from "../services/api";
 import "./TrainingPlanDetailPage.css";
 
 function TrainingPlanDetailPage() {
@@ -21,6 +22,8 @@ function TrainingPlanDetailPage() {
   const [error, setError] = useState(null);
   const [expandedWeeks, setExpandedWeeks] = useState([0]);
   const [completingWorkout, setCompletingWorkout] = useState(null);
+  const [syncingToCalendar, setSyncingToCalendar] = useState(false);
+  const [calendarSyncMessage, setCalendarSyncMessage] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -89,6 +92,54 @@ function TrainingPlanDetailPage() {
       alert("Błąd podczas zapisywania treningu");
     } finally {
       setCompletingWorkout(null);
+    }
+  };
+
+  const handleSyncToCalendar = async () => {
+    setSyncingToCalendar(true);
+    setCalendarSyncMessage(null);
+
+    try {
+      const response = await trainingPlanAPI.syncToCalendar(planId);
+      
+      setCalendarSyncMessage({
+        type: 'success',
+        text: `✅ Zsynchronizowano ${response.data.totalEvents} treningów z Google Calendar!`,
+      });
+      
+      await fetchPlan();
+      
+      setTimeout(() => setCalendarSyncMessage(null), 5000);
+    } catch (error) {
+      console.error("Sync to calendar error:", error);
+      
+      if (error.response?.data?.requiresGoogleAuth) {
+        const userConfirmed = window.confirm(
+          'Aby zsynchronizować plan z kalendarzem, musisz połączyć konto Google. Czy chcesz to zrobić teraz?'
+        );
+        
+        if (userConfirmed) {
+          try {
+            const authRes = await authAPI.googleAuth();
+            window.location.href = authRes.data.authUrl;
+          } catch (authError) {
+            console.error('Google auth error:', authError);
+            setCalendarSyncMessage({
+              type: 'error',
+              text: 'Błąd podczas łączenia z Google Calendar',
+            });
+          }
+        }
+      } else {
+        setCalendarSyncMessage({
+          type: 'error',
+          text: error.response?.data?.error || 'Błąd podczas synchronizacji z kalendarzem',
+        });
+      }
+      
+      setTimeout(() => setCalendarSyncMessage(null), 5000);
+    } finally {
+      setSyncingToCalendar(false);
     }
   };
 
@@ -185,6 +236,23 @@ function TrainingPlanDetailPage() {
             <p className="plan-goal">{plan.goal}</p>
           </div>
 
+          <button 
+            className="sync-calendar-btn"
+            onClick={handleSyncToCalendar}
+            disabled={syncingToCalendar}
+          >
+            <CalendarPlus size={20} />
+            {syncingToCalendar ? 'Synchronizacja...' : plan.syncedToCalendar ? 'Aktualizuj kalendarz' : 'Wyślij do kalendarza'}
+          </button>
+        </div>
+
+        {calendarSyncMessage && (
+          <div className={`calendar-sync-message ${calendarSyncMessage.type}`}>
+            {calendarSyncMessage.text}
+          </div>
+        )}
+
+        <div className="plan-stats-row">
           <div className="plan-stats">
             <div className="stat-card">
               <Calendar size={20} />
@@ -255,29 +323,52 @@ function TrainingPlanDetailPage() {
 
               {expandedWeeks.includes(weekIndex) && (
                 <div className="workouts-list">
-                  {week.workouts?.map((workout) => (
+                  {week.workouts?.map((workout) => {
+                    const isRestDay = workout.workoutType === 'REST';
+                    
+                    return (
                     <div
                       key={workout.id}
-                      className={`workout-card ${workout.completed ? "completed" : ""}`}
+                      className={`workout-card ${workout.completed ? "completed" : ""} ${isRestDay ? "rest-day" : ""}`}
                     >
+                      {isRestDay ? (
+                        <>
+                          <div className="workout-header">
+                            <div className="workout-day">
+                              {getDayName(workout.dayOfWeek)}
+                            </div>
+                          </div>
+                          
+                          <h4 className="workout-name">Dzień odpoczynku</h4>
+                          <div className="workout-type rest-type">
+                            Regeneracja
+                          </div>
+                          
+                          <p className="rest-description">
+                            Aktywna regeneracja organizmu. Możesz wykonać lekki spacer lub stretching.
+                          </p>
+
+                          <button
+                            className={`complete-btn ${workout.completed ? "completed" : ""}`}
+                            onClick={() =>
+                              !workout.completed && handleCompleteWorkout(workout.id)
+                            }
+                            disabled={workout.completed || completingWorkout === workout.id}
+                          >
+                            {workout.completed ? (
+                              <CheckCircle2 size={18} />
+                            ) : (
+                              <Circle size={18} />
+                            )}
+                            {workout.completed ? "Ukończono" : "Oznacz jako ukończone"}
+                          </button>
+                        </>
+                      ) : (
+                        <>
                       <div className="workout-header">
                         <div className="workout-day">
                           {getDayName(workout.dayOfWeek)}
                         </div>
-                        <button
-                          className={`complete-btn ${workout.completed ? "completed" : ""}`}
-                          onClick={() =>
-                            !workout.completed && handleCompleteWorkout(workout.id)
-                          }
-                          disabled={workout.completed || completingWorkout === workout.id}
-                        >
-                          {workout.completed ? (
-                            <CheckCircle2 size={20} />
-                          ) : (
-                            <Circle size={20} />
-                          )}
-                          {workout.completed ? "Ukończono" : "Oznacz jako ukończone"}
-                        </button>
                       </div>
 
                       <h4 className="workout-name">{workout.name}</h4>
@@ -285,40 +376,58 @@ function TrainingPlanDetailPage() {
                         {getWorkoutTypeLabel(workout.workoutType)}
                       </div>
 
-                      <p className="workout-description">{workout.description}</p>
+                      {(() => {
+                        let parsedIntervals;
+                        try {
+                          parsedIntervals = typeof workout.intervals === 'string' 
+                            ? JSON.parse(workout.intervals) 
+                            : workout.intervals;
+                        } catch {
+                          parsedIntervals = null;
+                        }
+                        const hasStructure = parsedIntervals && (parsedIntervals.warmup || parsedIntervals.main || parsedIntervals.intervals);
 
-                      <div className="workout-targets">
-                        {workout.targetDistance && (
-                          <div className="target-item">
-                            <span className="target-label">Dystans:</span>
-                            <span className="target-value">
-                              {workout.targetDistance.toFixed(1)} km
-                            </span>
-                          </div>
-                        )}
-                        {workout.targetDuration && (
-                          <div className="target-item">
-                            <span className="target-label">Czas:</span>
-                            <span className="target-value">
-                              {workout.targetDuration} min
-                            </span>
-                          </div>
-                        )}
-                        {workout.targetPace && (
-                          <div className="target-item">
-                            <span className="target-label">Tempo:</span>
-                            <span className="target-value">
-                              {workout.targetPace}
-                            </span>
-                          </div>
-                        )}
-                        {workout.intensity && (
-                          <div className="target-item">
-                            <span className="target-label">Intensywność:</span>
-                            <span className="target-value">{workout.intensity}</span>
-                          </div>
-                        )}
-                      </div>
+                        return (
+                          <>
+                            {!hasStructure && <p className="workout-description">{workout.description}</p>}
+
+                            {!hasStructure && (
+                              <div className="workout-targets">
+                                {workout.targetDistance && (
+                                  <div className="target-item">
+                                    <span className="target-label">Dystans:</span>
+                                    <span className="target-value">
+                                      {workout.targetDistance.toFixed(1)} km
+                                    </span>
+                                  </div>
+                                )}
+                                {workout.targetDuration && (
+                                  <div className="target-item">
+                                    <span className="target-label">Czas:</span>
+                                    <span className="target-value">
+                                      {workout.targetDuration} min
+                                    </span>
+                                  </div>
+                                )}
+                                {workout.targetPace && (
+                                  <div className="target-item">
+                                    <span className="target-label">Tempo:</span>
+                                    <span className="target-value">
+                                      {workout.targetPace}
+                                    </span>
+                                  </div>
+                                )}
+                                {workout.intensity && (
+                                  <div className="target-item">
+                                    <span className="target-label">Intensywność:</span>
+                                    <span className="target-value">{workout.intensity}</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
 
                       {workout.intervals && (() => {
                         let parsedIntervals;
@@ -332,7 +441,6 @@ function TrainingPlanDetailPage() {
                         
                         return parsedIntervals && (
                           <div className="intervals-section">
-                            <div className="intervals-label">Struktura treningu</div>
                             <div className="interval-phases">
                               {parsedIntervals.warmup && (
                                 <div className="interval-phase warmup">
@@ -342,11 +450,11 @@ function TrainingPlanDetailPage() {
                                   </div>
                                 </div>
                               )}
-                              {parsedIntervals.intervals && (
+                              {(parsedIntervals.main || parsedIntervals.intervals) && (
                                 <div className="interval-phase main">
                                   <div className="phase-info">
                                     <div className="phase-title">Część główna</div>
-                                    <div className="phase-desc">{parsedIntervals.intervals}</div>
+                                    <div className="phase-desc">{parsedIntervals.main || parsedIntervals.intervals}</div>
                                     {parsedIntervals.recovery && (
                                       <div className="phase-recovery">
                                         {parsedIntervals.recovery}
@@ -388,8 +496,26 @@ function TrainingPlanDetailPage() {
                           )}
                         </div>
                       )}
+
+                      <button
+                        className={`complete-btn ${workout.completed ? "completed" : ""}`}
+                        onClick={() =>
+                          !workout.completed && handleCompleteWorkout(workout.id)
+                        }
+                        disabled={workout.completed || completingWorkout === workout.id}
+                      >
+                        {workout.completed ? (
+                          <CheckCircle2 size={18} />
+                        ) : (
+                          <Circle size={18} />
+                        )}
+                        {workout.completed ? "Ukończono" : "Oznacz jako ukończone"}
+                      </button>
+                      </>
+                      )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

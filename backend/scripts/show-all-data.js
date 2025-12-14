@@ -23,7 +23,6 @@ async function showAllData() {
       console.log(`   Strava ID: ${user.stravaId || "niepołączony"}`);
       console.log(`   Utworzony: ${user.createdAt.toLocaleString("pl-PL")}\n`);
 
-      // Policz aktywności dla tego użytkownika
       const activityCount = await prisma.activity.count({
         where: { userId: user.id },
       });
@@ -31,7 +30,6 @@ async function showAllData() {
       console.log(`   📊 Aktywności: ${activityCount}`);
 
       if (activityCount > 0) {
-        // Pokaż kilka przykładów
         const sampleActivities = await prisma.activity.findMany({
           where: { userId: user.id },
           orderBy: { startDate: "desc" },
@@ -52,7 +50,6 @@ async function showAllData() {
         });
       }
 
-      // Sprawdź UserStats
       const stats = await prisma.userStats.findUnique({
         where: { userId: user.id },
       });
@@ -69,7 +66,6 @@ async function showAllData() {
       console.log("\n" + "=".repeat(60) + "\n");
     }
 
-    // Sprawdź czy są aktywności bez przypisanego użytkownika
     const orphanedActivities = await prisma.activity.findMany({
       where: {
         userId: {

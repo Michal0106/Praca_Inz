@@ -94,6 +94,8 @@ export const authAPI = {
   getCurrentUser: () => api.get("/auth/me"),
   refresh: (refreshToken) => api.post("/auth/refresh", { refreshToken }),
   unlinkStrava: () => api.post("/auth/strava/unlink"),
+  googleAuth: () => api.get("/auth/google"),
+  unlinkGoogle: () => api.post("/auth/google/unlink"),
 
   
 
@@ -132,6 +134,7 @@ export const activitiesAPI = {
   syncActivities: () => api.post("/activities/sync"),
   recalculatePaceData: () => api.post("/activities/recalculate-pace"),
   syncBestEfforts: () => api.post("/activities/sync-best-efforts"),
+  fetchActivityDetails: (id) => api.post(`/activities/${id}/fetch-details`),
 };
 
 export const analyticsAPI = {
@@ -229,6 +232,7 @@ export const trainingPlanAPI = {
   completeWorkout: (workoutId, data) => api.patch(`/training-plan/workout/${workoutId}/complete`, data),
   updatePlanStatus: (planId, status) => api.patch(`/training-plan/my-plans/${planId}/status`, { status }),
   deletePlan: (planId) => api.delete(`/training-plan/my-plans/${planId}`),
+  syncToCalendar: (planId) => api.post(`/training-plan/my-plans/${planId}/sync-to-calendar`),
 };
 
 export default api;

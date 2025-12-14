@@ -1,13 +1,52 @@
 import { X, ChevronDown, ChevronUp } from "lucide-react";
 import { useState } from "react";
+import { activitiesAPI } from "../services/api";
 import "./ActivityModal.css";
 
-function ActivityModal({ activity, onClose }) {
+function ActivityModal({ activity, onClose, onRefresh }) {
   const [showBestEfforts, setShowBestEfforts] = useState(false);
   const [showLaps, setShowLaps] = useState(false);
   const [selectedLap, setSelectedLap] = useState(null);
+  const [fetchingDetails, setFetchingDetails] = useState(false);
+  const [detailsError, setDetailsError] = useState(null);
 
   if (!activity) return null;
+
+  const hasBestEfforts = activity.bestEfforts && Array.isArray(activity.bestEfforts) && activity.bestEfforts.length > 0;
+  const hasLaps = activity.laps && Array.isArray(activity.laps) && activity.laps.length > 0;
+  
+  console.log('ActivityModal debug:', {
+    source: activity.source,
+    hasBestEfforts,
+    hasLaps,
+    bestEffortsValue: activity.bestEfforts,
+    lapsValue: activity.laps
+  });
+  
+  const needsDetails = (activity.source === 'STRAVA' || activity.source === 'strava') && !hasBestEfforts && !hasLaps;
+
+  const handleFetchDetails = async () => {
+    setFetchingDetails(true);
+    setDetailsError(null);
+    
+    try {
+      await activitiesAPI.fetchActivityDetails(activity.id);
+      
+      if (onRefresh) {
+        await onRefresh();
+      }
+    } catch (error) {
+      console.error('Error fetching activity details:', error);
+      
+      if (error.response?.status === 429) {
+        setDetailsError('Osiągnięto limit API Strava. Spróbuj ponownie za 15 minut.');
+      } else {
+        setDetailsError('Wystąpił błąd podczas pobierania szczegółów.');
+      }
+    } finally {
+      setFetchingDetails(false);
+    }
+  };
 
   const formatDuration = (seconds) => {
     const hours = Math.floor(seconds / 3600);
@@ -60,9 +99,6 @@ function ActivityModal({ activity, onClose }) {
     return colors[type] || colors.default;
   };
 
-  const hasBestEfforts = activity.bestEfforts && Array.isArray(activity.bestEfforts) && activity.bestEfforts.length > 0;
-  const hasLaps = activity.laps && Array.isArray(activity.laps) && activity.laps.length > 0;
-
   const getPaceValue = (lap) => {
     if (!lap.distance || lap.distance === 0) return 0;
     const paceSecondsPerKm = (lap.elapsed_time / lap.distance) * 1000;
@@ -105,10 +141,23 @@ function ActivityModal({ activity, onClose }) {
             </div>
 
             <div className="stat-card-primary">
-              <span className="stat-card-label">Śr. prędkość</span>
+              <span className="stat-card-label">
+                {activity.type === 'Run' || activity.type === 'VirtualRun' ? 'Śr. tempo' : 'Śr. prędkość'}
+              </span>
               <div className="stat-card-value-row">
-                <span className="stat-card-value">{((activity.averageSpeed || 0) * 3.6).toFixed(1)}</span>
-                <span className="stat-card-unit">km/h</span>
+                {activity.type === 'Run' || activity.type === 'VirtualRun' ? (
+                  <>
+                    <span className="stat-card-value">
+                      {formatPace(activity.duration, activity.distance)}
+                    </span>
+                    <span className="stat-card-unit">/km</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="stat-card-value">{((activity.averageSpeed || 0) * 3.6).toFixed(1)}</span>
+                    <span className="stat-card-unit">km/h</span>
+                  </>
+                )}
               </div>
             </div>
 
@@ -148,8 +197,15 @@ function ActivityModal({ activity, onClose }) {
             )}
 
             <div className="secondary-stat">
-              <span className="secondary-label">Max prędkość</span>
-              <span className="secondary-value">{((activity.maxSpeed || 0) * 3.6).toFixed(1)} km/h</span>
+              <span className="secondary-label">
+                {activity.type === 'Run' || activity.type === 'VirtualRun' ? 'Najlepsze tempo' : 'Max prędkość'}
+              </span>
+              <span className="secondary-value">
+                {activity.type === 'Run' || activity.type === 'VirtualRun' 
+                  ? formatPace(1000 / (activity.maxSpeed || 1), 1000) + '/km'
+                  : ((activity.maxSpeed || 0) * 3.6).toFixed(1) + ' km/h'
+                }
+              </span>
             </div>
 
             {activity.elevationGain !== undefined && activity.elevationGain !== null && (
@@ -326,6 +382,21 @@ function ActivityModal({ activity, onClose }) {
                 </div>
               )}
                 </>
+              )}
+            </div>
+          )}
+
+          {needsDetails && (
+            <div className="fetch-details-footer">
+              <button 
+                className="fetch-details-btn"
+                onClick={handleFetchDetails}
+                disabled={fetchingDetails}
+              >
+                {fetchingDetails ? 'Pobieranie szczegółów...' : 'Pobierz szczegóły aktywności'}
+              </button>
+              {detailsError && (
+                <p className="details-error">{detailsError}</p>
               )}
             </div>
           )}

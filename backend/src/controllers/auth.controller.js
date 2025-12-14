@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import prisma from "../config/database.js";
 import { stravaService } from "../services/strava.service.js";
 import { jwtService } from "../services/jwt.service.js";
+import * as googleService from "../services/google.service.js";
 
 import crypto from "crypto";
 import { sendPasswordResetEmail } from "../services/email.service.js";
@@ -315,6 +316,7 @@ export const getCurrentUser = async (req, res) => {
         lastName: user.lastName,
         hasStravaData: isStravaConnected,
         hasGarminData: !!user.garminId,
+        hasGoogleCalendar: !!user.googleRefreshToken,
         stats: user.userStats,
       },
     });
@@ -492,15 +494,8 @@ async function syncStravaActivities(userId, accessToken) {
       });
 
       if (!existing) {
-        console.log(`Fetching details for activity ${activity.id}...`);
-        
         try {
-          await new Promise(resolve => setTimeout(resolve, 250));
-          
-          const detailedActivity = await stravaService.getActivity(
-            accessToken,
-            activity.id,
-          );
+          await new Promise(resolve => setTimeout(resolve, 100));
 
           await prisma.activity.create({
             data: {
@@ -521,67 +516,17 @@ async function syncStravaActivities(userId, accessToken) {
               averagePower: activity.average_watts,
               maxPower: activity.max_watts,
               trainingLoad: activity.suffer_score,
-              bestEfforts: detailedActivity.best_efforts || null,
-              laps: detailedActivity.laps || null,
+              bestEfforts: null,
+              laps: null,
             },
           });
           newCount++;
           
-          if (newCount % 50 === 0) {
+          if (newCount % 100 === 0) {
             console.log(`Saved ${newCount} activities...`);
           }
-        } catch (detailError) {
-          if (detailError.response?.status === 429) {
-            console.log(`⚠️  Rate limit hit. Saving basic activity data without details.`);
-            await prisma.activity.create({
-              data: {
-                userId,
-                externalId: activity.id.toString(),
-                source: "STRAVA",
-                name: activity.name,
-                type: activity.type,
-                startDate: new Date(activity.start_date),
-                duration: activity.moving_time,
-                distance: activity.distance,
-                averageHeartRate: activity.average_heartrate,
-                maxHeartRate: activity.max_heartrate,
-                averageSpeed: activity.average_speed,
-                maxSpeed: activity.max_speed,
-                elevationGain: activity.total_elevation_gain,
-                calories: activity.calories,
-                averagePower: activity.average_watts,
-                maxPower: activity.max_watts,
-                trainingLoad: activity.suffer_score,
-              },
-            });
-            newCount++;
-            console.log(`⏸  Pausing sync due to rate limit. ${newCount} activities saved.`);
-            break;
-          } else {
-            console.error(`Error fetching details for ${activity.id}:`, detailError.message);
-            await prisma.activity.create({
-              data: {
-                userId,
-                externalId: activity.id.toString(),
-                source: "STRAVA",
-                name: activity.name,
-                type: activity.type,
-                startDate: new Date(activity.start_date),
-                duration: activity.moving_time,
-                distance: activity.distance,
-                averageHeartRate: activity.average_heartrate,
-                maxHeartRate: activity.max_heartrate,
-                averageSpeed: activity.average_speed,
-                maxSpeed: activity.max_speed,
-                elevationGain: activity.total_elevation_gain,
-                calories: activity.calories,
-                averagePower: activity.average_watts,
-                maxPower: activity.max_watts,
-                trainingLoad: activity.suffer_score,
-              },
-            });
-            newCount++;
-          }
+        } catch (createError) {
+          console.error(`Error saving activity ${activity.id}:`, createError.message);
         }
       } else {
         existingCount++;
@@ -626,3 +571,81 @@ async function syncStravaActivities(userId, accessToken) {
     throw error;
   }
 }
+
+// ==================== GOOGLE CALENDAR AUTH ====================
+
+export const googleAuth = (req, res) => {
+  try {
+    const userId = req.user?.userId || req.user?.id;
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+    
+    // Przekaż userId w state
+    const authUrl = googleService.getAuthUrl(userId);
+    res.json({ authUrl });
+  } catch (error) {
+    console.error('Error generating Google auth URL:', error);
+    res.status(500).json({ error: 'Failed to generate authorization URL' });
+  }
+};
+
+export const googleCallback = async (req, res) => {
+  try {
+    const { code, state } = req.query;
+    
+    if (!code) {
+      return res.status(400).json({ error: 'Authorization code is required' });
+    }
+
+    if (!state) {
+      return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/account?google=error&reason=no_state`);
+    }
+
+    const userId = state; // userId przekazany w state
+
+    // Wymień kod na tokeny
+    const tokens = await googleService.exchangeCodeForTokens(code);
+
+    // Zapisz tokeny w bazie
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        googleAccessToken: tokens.access_token,
+        googleRefreshToken: tokens.refresh_token,
+        googleTokenExpiresAt: new Date(tokens.expiry_date),
+      },
+    });
+
+    // Przekieruj z powrotem do frontendu
+    res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/account?google=success`);
+  } catch (error) {
+    console.error('Error in Google callback:', error);
+    res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/account?google=error`);
+  }
+};
+
+export const unlinkGoogle = async (req, res) => {
+  try {
+    const userId = req.user?.userId || req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        googleAccessToken: null,
+        googleRefreshToken: null,
+        googleTokenExpiresAt: null,
+      },
+    });
+
+    res.json({ message: 'Google Calendar disconnected successfully' });
+  } catch (error) {
+    console.error('Error unlinking Google:', error);
+    res.status(500).json({ error: 'Failed to unlink Google Calendar' });
+  }
+};

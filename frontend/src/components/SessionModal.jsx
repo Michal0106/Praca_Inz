@@ -182,11 +182,11 @@ function SessionModal({ session, intervals, onClose }) {
                     </div>
                   </div>
                 )}
-                {parsedIntervals.intervals && (
+                {(parsedIntervals.intervals || parsedIntervals.mainSet) && (
                   <div className="interval-phase main-work">
                     <div className="phase-content">
                       <div className="phase-label">Część główna</div>
-                      <div className="phase-value">{parsedIntervals.intervals}</div>
+                      <div className="phase-value">{parsedIntervals.intervals || parsedIntervals.mainSet}</div>
                       {parsedIntervals.recovery && (
                         <div className="phase-recovery">
                           <span className="recovery-text">{parsedIntervals.recovery}</span>
