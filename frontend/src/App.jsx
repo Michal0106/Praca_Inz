@@ -59,7 +59,7 @@ function App() {
           <Route path="/account" element={<AccountPage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />
           <Route path="/best-efforts" element={<BestEffortsPage />} />
-          <Route path="/training-plan" element={<TrainingPlanPage />} />
+          {/* <Route path="/training-plan" element={<TrainingPlanPage />} /> */}
           <Route path="/training-plans" element={<MyTrainingPlansPage />} />
           <Route path="/training-plans/create" element={<CreateTrainingPlanPage />} />
           <Route path="/training-plans/:planId" element={<TrainingPlanDetailPage />} />

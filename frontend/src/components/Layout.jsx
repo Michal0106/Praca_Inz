@@ -10,7 +10,7 @@ function Layout({ children }) {
     { path: "/dashboard", icon: Home, label: "Panel" },
     { path: "/analytics", icon: BarChart3, label: "Analizuj" },
     { path: "/best-efforts", icon: Trophy, label: "Best Efforts" },
-    { path: "/training-plan", icon: Calendar, label: "Plan treningowy" },
+    // { path: "/training-plan", icon: Calendar, label: "Plan treningowy" },
     { path: "/training-plans", icon: ListChecks, label: "Moje plany" },
     { path: "/compare", icon: GitCompare, label: "Porównaj" },
     { path: "/account", icon: User, label: "Moje konto" },
