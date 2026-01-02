@@ -246,7 +246,7 @@ export const trainingPlanAPI = {
   addWorkout: (planId, data) => api.post(`/training-plan/my-plans/${planId}/workout`, data),
   updatePlanStatus: (planId, status) => api.patch(`/training-plan/my-plans/${planId}/status`, { status }),
   deletePlan: (planId) => api.delete(`/training-plan/my-plans/${planId}`),
-  syncToCalendar: (planId) => api.post(`/training-plan/my-plans/${planId}/sync-to-calendar`),
+  syncToCalendar: (planId, startDate) => api.post(`/training-plan/my-plans/${planId}/sync-to-calendar`, { startDate }),
   syncToTasks: (planId) => api.post(`/training-plan/my-plans/${planId}/sync-to-tasks`),
   recomputeWorkouts: (planId) => api.post(`/training-plan/my-plans/${planId}/recompute-workouts`),
 };

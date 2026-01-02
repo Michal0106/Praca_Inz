@@ -39,6 +39,8 @@ function TrainingPlanDetailPage() {
   const [selectedWeek, setSelectedWeek] = useState(null);
   const [selectedDay, setSelectedDay] = useState(null);
   const [viewMode, setViewMode] = useState("week"); // "week" or "list"
+  const [showStartDateModal, setShowStartDateModal] = useState(false);
+  const [selectedStartDate, setSelectedStartDate] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -110,16 +112,33 @@ function TrainingPlanDetailPage() {
     }
   };
 
-  const handleSyncToCalendar = async () => {
+  const handleSyncToCalendar = () => {
+    // Pokaż modal wyboru daty rozpoczęcia
+    const nextMonday = getNextMonday();
+    setSelectedStartDate(nextMonday);
+    setShowStartDateModal(true);
+  };
+
+  const getNextMonday = () => {
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    const daysUntilMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek) % 7;
+    const nextMonday = new Date(today);
+    nextMonday.setDate(today.getDate() + daysUntilMonday);
+    return nextMonday.toISOString().split('T')[0];
+  };
+
+  const handleConfirmSync = async () => {
+    setShowStartDateModal(false);
     setSyncingToCalendar(true);
     setCalendarSyncMessage(null);
 
     try {
-      const response = await trainingPlanAPI.syncToTasks(planId);
+      const response = await trainingPlanAPI.syncToCalendar(planId, selectedStartDate);
       
       setCalendarSyncMessage({
         type: 'success',
-        text: `✅ Zsynchronizowano ${response.data.totalTasks} treningów do Google Tasks!`,
+        text: `✅ Zsynchronizowano ${response.data.totalEvents || response.data.totalTasks || 0} treningów do Google Calendar!`,
       });
       
       await fetchPlan();
@@ -133,7 +152,9 @@ function TrainingPlanDetailPage() {
         const userConfirmed = window.confirm(
           code === "google_missing_refresh_token"
             ? "Twoje połączenie Google jest niekompletne (brak refresh tokena).\n\nKliknij OK aby połączyć ponownie Google.\nJeśli problem wróci: wejdź w ustawienia konta Google i cofnij dostęp aplikacji, a potem połącz ponownie."
-            : "Aby zsynchronizować plan do Google Tasks, musisz połączyć konto Google (dostęp do Zadań). Czy chcesz to zrobić teraz?"
+            : code === "google_calendar_scope_missing"
+            ? "Aby zsynchronizować plan do Google Calendar, musisz połączyć konto Google z uprawnieniami do Kalendarza. Czy chcesz to zrobić teraz?"
+            : "Aby zsynchronizować plan do Google Calendar, musisz połączyć konto Google. Czy chcesz to zrobić teraz?"
         );
         
         if (userConfirmed) {
@@ -151,7 +172,7 @@ function TrainingPlanDetailPage() {
       } else {
         setCalendarSyncMessage({
           type: 'error',
-          text: error.response?.data?.error || 'Błąd podczas synchronizacji do Google Tasks',
+          text: error.response?.data?.error || 'Błąd podczas synchronizacji do Google Calendar',
         });
       }
       
@@ -397,6 +418,44 @@ function TrainingPlanDetailPage() {
   return (
     <Layout>
       <div className="plan-detail-page">
+        {showStartDateModal && (
+          <div className="modal-overlay" onClick={() => setShowStartDateModal(false)}>
+            <div className="start-date-modal" onClick={(e) => e.stopPropagation()}>
+              <h2>Wybierz datę rozpoczęcia planu</h2>
+              <p className="modal-description">
+                Plan treningowy rozpocznie się w poniedziałek wybranego tygodnia.
+              </p>
+              
+              <div className="date-picker-container">
+                <label htmlFor="startDate">Data rozpoczęcia (poniedziałek):</label>
+                <input
+                  type="date"
+                  id="startDate"
+                  value={selectedStartDate}
+                  onChange={(e) => setSelectedStartDate(e.target.value)}
+                  className="date-input"
+                />
+              </div>
+
+              <div className="modal-actions">
+                <button 
+                  className="modal-btn cancel-btn"
+                  onClick={() => setShowStartDateModal(false)}
+                >
+                  Anuluj
+                </button>
+                <button 
+                  className="modal-btn confirm-btn"
+                  onClick={handleConfirmSync}
+                >
+                  <CalendarPlus size={18} />
+                  Synchronizuj
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <button className="back-btn" onClick={() => navigate("/training-plans")}>
           <ArrowLeft size={20} />
           Powrót do planów

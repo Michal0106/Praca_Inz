@@ -1303,7 +1303,7 @@ export const syncPlanToGoogleTasks = async (req, res) => {
       });
     }
 
-    const tasksScope = "https://www.googleapis.com/auth/tasks";
+    const tasksScope = "https://www.googleapis.com/auth/calendar";
     if (!String(user.googleScopes || "").includes(tasksScope)) {
       return res.status(403).json({
         error: "Google Tasks permission not granted. Reconnect Google and allow Tasks access.",
@@ -1884,29 +1884,43 @@ export const getSessionById = async (req, res) => {
 
 export const syncPlanToCalendar = async (req, res) => {
   try {
-    // Backwards-compatible endpoint. New implementation uses Google Tasks.
-    return await syncPlanToGoogleTasks(req, res);
+    // Sync to Google Calendar (events)
+    return await syncPlanToCalendarLegacy(req, res);
   } catch (error) {
-    console.error("Error syncing plan (compat) to tasks:", error);
-    return res.status(500).json({ error: "Failed to sync training plan" });
+    console.error("Error syncing plan to calendar:", error);
+    return res.status(500).json({ error: "Failed to sync training plan to calendar" });
   }
 };
 
 export const syncPlanToCalendarLegacy = async (req, res) => {
   try {
     const { id: planId } = req.params;
+    const { startDate: customStartDate } = req.body;
     const userId = getUserId(req);
     
     console.log(`[Sync Calendar] Starting sync for plan ${planId}...`);
+    if (customStartDate) {
+      console.log(`[Sync Calendar] Custom start date provided: ${customStartDate}`);
+    }
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { googleRefreshToken: true },
+      select: { googleRefreshToken: true, googleScopes: true },
     });
 
     if (!user?.googleRefreshToken) {
-      return res.status(400).json({ 
+      return res.status(409).json({ 
         error: 'Google Calendar not connected',
+        code: 'google_missing_refresh_token',
+        requiresGoogleAuth: true,
+      });
+    }
+
+    const calendarScope = 'https://www.googleapis.com/auth/calendar';
+    if (!String(user.googleScopes || '').includes(calendarScope)) {
+      return res.status(403).json({
+        error: 'Google Calendar permission not granted. Reconnect Google and allow Calendar access.',
+        code: 'google_calendar_scope_missing',
         requiresGoogleAuth: true,
       });
     }
@@ -1936,7 +1950,11 @@ export const syncPlanToCalendarLegacy = async (req, res) => {
     console.log(`[Sync Calendar] Syncing ${totalWorkouts} workouts (estimated ${estimatedTime}s)...`);
 
     let startDate;
-    if (plan.targetRaceDate) {
+    if (customStartDate) {
+      // Użyj daty podanej przez użytkownika
+      startDate = new Date(customStartDate);
+      console.log(`[Sync Calendar] Using custom start date: ${startDate.toISOString()}`);
+    } else if (plan.targetRaceDate) {
       startDate = new Date(plan.targetRaceDate);
       startDate.setDate(startDate.getDate() - (plan.weeksCount * 7));
     } else {
