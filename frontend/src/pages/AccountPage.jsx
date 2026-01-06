@@ -28,11 +28,22 @@ function AccountPage() {
     lastName: '',
     email: ''
   });
+  const [editingStravaCredentials, setEditingStravaCredentials] = useState(false);
+  const [stravaCredentialsForm, setStravaCredentialsForm] = useState({
+    stravaClientId: '',
+    stravaClientSecret: ''
+  });
+  const [stravaCredentialsStatus, setStravaCredentialsStatus] = useState({
+    hasClientId: false,
+    hasClientSecret: false,
+    clientIdPreview: null
+  });
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
     fetchUserData();
+    fetchStravaCredentialsStatus();
 
     const stravaLinked = searchParams.get("strava") === "linked";
     const stravaError = searchParams.get("error");
@@ -60,6 +71,12 @@ function AccountPage() {
           "Jeśli to Twoje konto, zaloguj się używając tego konta Strava lub odłącz je najpierw od starego konta.",
       );
       setSearchParams({});
+    } else if (stravaError === "strava_credentials_missing") {
+      alert(
+        "⚠️ Brak danych Strava API\n\n" +
+          "Musisz najpierw podać swój Strava Client ID i Client Secret w ustawieniach konta.",
+      );
+      setSearchParams({});
     } else if (stravaError === "auth_failed") {
       alert(
         "Wystąpił błąd podczas łączenia z kontem Strava.\n\n" +
@@ -82,7 +99,16 @@ function AccountPage() {
     }
   };
 
-  const handleLinkStrava = () => {
+  const handleLinkStrava = async () => {
+    // Sprawdź czy użytkownik ma ustawione credentials
+    if (!stravaCredentialsStatus.hasClientId || !stravaCredentialsStatus.hasClientSecret) {
+      alert(
+        '⚠️ Brak danych Strava API\n\n' +
+        'Musisz najpierw podać swój Strava Client ID i Client Secret w sekcji "Strava API - Dane połączenia" powyżej.'
+      );
+      return;
+    }
+
     setLinking(true);
 
     const accessToken = localStorage.getItem("accessToken");
@@ -183,6 +209,44 @@ function AccountPage() {
 
   const handleCancelEditProfile = () => {
     setEditingProfile(false);
+  };
+
+  const fetchStravaCredentialsStatus = async () => {
+    try {
+      const { data } = await authAPI.getStravaCredentials();
+      setStravaCredentialsStatus(data);
+    } catch (error) {
+      console.error('Error fetching Strava credentials:', error);
+    }
+  };
+
+  const handleEditStravaCredentials = () => {
+    setStravaCredentialsForm({
+      stravaClientId: '',
+      stravaClientSecret: ''
+    });
+    setEditingStravaCredentials(true);
+  };
+
+  const handleSaveStravaCredentials = async () => {
+    try {
+      if (!stravaCredentialsForm.stravaClientId || !stravaCredentialsForm.stravaClientSecret) {
+        alert('❌ Client ID i Client Secret są wymagane');
+        return;
+      }
+
+      await authAPI.updateStravaCredentials(stravaCredentialsForm);
+      await fetchStravaCredentialsStatus();
+      setEditingStravaCredentials(false);
+      alert('✅ Dane Strava API zostały zapisane pomyślnie!\n\n🔗 Możesz teraz połączyć swoje konto Strava.');
+    } catch (error) {
+      console.error('Update Strava credentials error:', error);
+      alert('Błąd podczas zapisywania danych Strava API: ' + (error.response?.data?.error || error.message));
+    }
+  };
+
+  const handleCancelEditStravaCredentials = () => {
+    setEditingStravaCredentials(false);
   };
 
   if (authLoading || loading) {
@@ -374,6 +438,142 @@ function AccountPage() {
                     </p>
                   </div>
                 </div>
+              </div>
+            )}
+          </div>
+
+          <div className="account-section">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h2>Strava API - Dane połączenia</h2>
+              {!editingStravaCredentials && (
+                <button
+                  onClick={handleEditStravaCredentials}
+                  style={{
+                    padding: '8px 16px',
+                    background: '#FC4C02',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <Edit2 size={16} />
+                  {stravaCredentialsStatus.hasClientId ? 'Aktualizuj dane' : 'Dodaj dane API'}
+                </button>
+              )}
+            </div>
+
+            {editingStravaCredentials ? (
+              <div style={{ padding: '20px', background: '#f9fafb', borderRadius: '8px' }}>
+                <div style={{ marginBottom: '16px', padding: '12px', background: '#fef3c7', borderRadius: '6px', border: '1px solid #fbbf24' }}>
+                  <p style={{ margin: 0, fontSize: '14px', color: '#92400e' }}>
+                    <strong>ℹ️ Jak uzyskać dane Strava API:</strong><br />
+                    1. Przejdź do <a href="https://www.strava.com/settings/api" target="_blank" rel="noopener noreferrer" style={{ color: '#1d4ed8', textDecoration: 'underline' }}>Strava API Settings</a><br />
+                    2. Utwórz nową aplikację (jeśli jeszcze nie masz)<br />
+                    3. Skopiuj "Client ID" i "Client Secret"<br />
+                    4. Wklej je poniżej
+                  </p>
+                </div>
+
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                    Strava Client ID
+                  </label>
+                  <input
+                    type="text"
+                    value={stravaCredentialsForm.stravaClientId}
+                    onChange={(e) => setStravaCredentialsForm({ ...stravaCredentialsForm, stravaClientId: e.target.value })}
+                    placeholder="np. 12345"
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      fontFamily: 'monospace'
+                    }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                    Strava Client Secret
+                  </label>
+                  <input
+                    type="password"
+                    value={stravaCredentialsForm.stravaClientSecret}
+                    onChange={(e) => setStravaCredentialsForm({ ...stravaCredentialsForm, stravaClientSecret: e.target.value })}
+                    placeholder="np. abc123def456..."
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      fontFamily: 'monospace'
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+                  <button
+                    onClick={handleSaveStravaCredentials}
+                    style={{
+                      padding: '10px 20px',
+                      background: '#10b981',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontWeight: '500'
+                    }}
+                  >
+                    Zapisz dane API
+                  </button>
+                  <button
+                    onClick={handleCancelEditStravaCredentials}
+                    style={{
+                      padding: '10px 20px',
+                      background: '#6b7280',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontWeight: '500'
+                    }}
+                  >
+                    Anuluj
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ padding: '20px', background: '#f9fafb', borderRadius: '8px' }}>
+                {stravaCredentialsStatus.hasClientId && stravaCredentialsStatus.hasClientSecret ? (
+                  <div>
+                    <p style={{ color: '#10b981', fontWeight: '500', marginBottom: '8px' }}>
+                      ✅ Dane Strava API są skonfigurowane
+                    </p>
+                    <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '8px' }}>
+                      Client ID: <code style={{ background: '#e5e7eb', padding: '2px 6px', borderRadius: '4px' }}>{stravaCredentialsStatus.clientIdPreview}</code>
+                    </p>
+                    <p style={{ fontSize: '14px', color: '#6b7280' }}>
+                      Możesz teraz połączyć swoje konto Strava poniżej.
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <p style={{ color: '#ef4444', fontWeight: '500', marginBottom: '8px' }}>
+                      ⚠️ Brak danych Strava API
+                    </p>
+                    <p style={{ fontSize: '14px', color: '#6b7280' }}>
+                      Aby połączyć konto Strava, musisz najpierw podać swój Client ID i Client Secret z aplikacji Strava API.
+                      Ze względu na limity API Strava, każdy użytkownik musi używać własnych danych API.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>

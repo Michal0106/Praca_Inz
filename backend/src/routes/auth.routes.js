@@ -14,6 +14,8 @@ import {
   googleAuth,
   googleCallback,
   unlinkGoogle,
+  updateStravaCredentials,
+  getStravaCredentials,
 } from "../controllers/auth.controller.js";
 import {
   authenticateJWT,
@@ -32,6 +34,8 @@ router.patch("/me", authenticateJWT, updateProfile);
 router.get("/strava", optionalAuthenticateJWT, stravaAuth);
 router.get("/strava/callback", optionalAuthenticateJWT, stravaCallback);
 router.post("/strava/unlink", authenticateJWT, unlinkStrava);
+router.put("/strava/credentials", authenticateJWT, updateStravaCredentials);
+router.get("/strava/credentials", authenticateJWT, getStravaCredentials);
 
 router.get("/google", authenticateJWT, googleAuth);
 router.get("/google/callback", optionalAuthenticateJWT, googleCallback);

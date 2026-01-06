@@ -14,6 +14,26 @@ export const getUserId = (req) => {
   return null;
 };
 
+export const getStravaCredentials = async (userId) => {
+  const { default: prisma } = await import("../config/database.js");
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      stravaClientId: true,
+      stravaClientSecret: true,
+    },
+  });
+
+  if (!user || !user.stravaClientId || !user.stravaClientSecret) {
+    return null;
+  }
+
+  return {
+    clientId: user.stravaClientId,
+    clientSecret: user.stravaClientSecret,
+  };
+};
+
 export const getStravaToken = async (req) => {
   if (req.session && req.session.accessToken) {
     return req.session.accessToken;
@@ -28,6 +48,8 @@ export const getStravaToken = async (req) => {
         stravaAccessToken: true,
         stravaTokenExpiresAt: true,
         stravaRefreshToken: true,
+        stravaClientId: true,
+        stravaClientSecret: true,
       },
     });
 
@@ -37,10 +59,14 @@ export const getStravaToken = async (req) => {
       const bufferTime = 5 * 60 * 1000; 
 
       if (expiresAt && now.getTime() > (expiresAt.getTime() - bufferTime)) {
-        if (user.stravaRefreshToken) {
+        if (user.stravaRefreshToken && user.stravaClientId && user.stravaClientSecret) {
           try {
             const { stravaService } = await import("../services/strava.service.js");
-            const refreshData = await stravaService.refreshToken(user.stravaRefreshToken);
+            const refreshData = await stravaService.refreshToken(
+              user.stravaRefreshToken,
+              user.stravaClientId,
+              user.stravaClientSecret
+            );
             
             await prisma.user.update({
               where: { id: userId },
@@ -76,4 +102,4 @@ export const getStravaToken = async (req) => {
   return null;
 };
 
-export default { getUserId, getStravaToken };
+export default { getUserId, getStravaToken, getStravaCredentials };

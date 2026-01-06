@@ -4,11 +4,11 @@ const STRAVA_API_BASE = "https://www.strava.com/api/v3";
 const STRAVA_OAUTH_BASE = "https://www.strava.com/oauth";
 
 class StravaService {
-  async exchangeToken(code) {
+  async exchangeToken(code, clientId, clientSecret) {
     try {
       const response = await axios.post(`${STRAVA_OAUTH_BASE}/token`, {
-        client_id: process.env.STRAVA_CLIENT_ID,
-        client_secret: process.env.STRAVA_CLIENT_SECRET,
+        client_id: clientId,
+        client_secret: clientSecret,
         code,
         grant_type: "authorization_code",
       });
@@ -23,11 +23,11 @@ class StravaService {
     }
   }
 
-  async refreshToken(refreshToken) {
+  async refreshToken(refreshToken, clientId, clientSecret) {
     try {
       const response = await axios.post(`${STRAVA_OAUTH_BASE}/token`, {
-        client_id: process.env.STRAVA_CLIENT_ID,
-        client_secret: process.env.STRAVA_CLIENT_SECRET,
+        client_id: clientId,
+        client_secret: clientSecret,
         refresh_token: refreshToken,
         grant_type: "refresh_token",
       });

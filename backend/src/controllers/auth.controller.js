@@ -403,38 +403,64 @@ export const updateProfile = async (req, res) => {
 };
 
 
-export const stravaAuth = (req, res) => {
-  const mode = req.query.mode === "connect" ? "connect" : "login";
-  const tokenFromQuery = req.query.token;
+export const stravaAuth = async (req, res) => {
+  try {
+    const mode = req.query.mode === "connect" ? "connect" : "login";
+    const tokenFromQuery = req.query.token;
 
-  let userId = null;
+    let userId = null;
 
-  if (tokenFromQuery) {
-    try {
-      const decoded = jwtService.verifyAccessToken(tokenFromQuery);
-      userId = decoded.userId;
-    } catch (error) {
-      console.error("Invalid token in query:", error);
+    if (tokenFromQuery) {
+      try {
+        const decoded = jwtService.verifyAccessToken(tokenFromQuery);
+        userId = decoded.userId;
+      } catch (error) {
+        console.error("Invalid token in query:", error);
+      }
     }
-  }
 
-  if (!userId && mode === "connect" && req.user?.userId) {
-    userId = req.user.userId;
-  }
+    if (!userId && mode === "connect" && req.user?.userId) {
+      userId = req.user.userId;
+    }
 
-  const stateData = JSON.stringify({ mode, userId });
+    if (!userId) {
+      return res.redirect(
+        `${process.env.CLIENT_URL}/account?error=must_login_first`
+      );
+    }
 
-  const url =
-    "https://www.strava.com/oauth/authorize?" +
-    new URLSearchParams({
-      client_id: process.env.STRAVA_CLIENT_ID,
-      response_type: "code",
-      redirect_uri: process.env.STRAVA_CALLBACK_URL,
-      scope: "activity:read_all,profile:read_all", 
-      state: stateData,
+    // Pobierz credentials użytkownika
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        stravaClientId: true,
+        stravaClientSecret: true,
+      },
     });
 
-  return res.redirect(url);
+    if (!user || !user.stravaClientId || !user.stravaClientSecret) {
+      return res.redirect(
+        `${process.env.CLIENT_URL}/account?error=strava_credentials_missing`
+      );
+    }
+
+    const stateData = JSON.stringify({ mode, userId });
+
+    const url =
+      "https://www.strava.com/oauth/authorize?" +
+      new URLSearchParams({
+        client_id: user.stravaClientId,
+        response_type: "code",
+        redirect_uri: process.env.STRAVA_CALLBACK_URL,
+        scope: "activity:read_all,profile:read_all", 
+        state: stateData,
+      });
+
+    return res.redirect(url);
+  } catch (error) {
+    console.error("Strava auth error:", error);
+    return res.redirect(`${process.env.CLIENT_URL}/account?error=strava_auth_failed`);
+  }
 };
 
 
@@ -442,21 +468,8 @@ export const stravaCallback = async (req, res) => {
   try {
     const { code, state } = req.query;
 
-    const { access_token, refresh_token, expires_at } =
-      await stravaService.exchangeToken(code);
-
-    const athlete = await stravaService.getAthleteProfile(access_token);
-
     const stateData = JSON.parse(state);
     const mode = stateData.mode || "login";
-
-    if (mode !== "connect") {
-      return res.redirect(
-        `${process.env.CLIENT_URL}/login?error=strava_login_disabled`
-      );
-    }
-
-    const stravaId = athlete.id.toString();
     const userId = stateData.userId;
 
     if (!userId) {
@@ -464,6 +477,37 @@ export const stravaCallback = async (req, res) => {
         `${process.env.CLIENT_URL}/login?error=must_login_first`
       );
     }
+
+    if (mode !== "connect") {
+      return res.redirect(
+        `${process.env.CLIENT_URL}/login?error=strava_login_disabled`
+      );
+    }
+
+    // Pobierz credentials użytkownika
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        stravaClientId: true,
+        stravaClientSecret: true,
+      },
+    });
+
+    if (!user || !user.stravaClientId || !user.stravaClientSecret) {
+      return res.redirect(
+        `${process.env.CLIENT_URL}/account?error=strava_credentials_missing`
+      );
+    }
+
+    const { access_token, refresh_token, expires_at } =
+      await stravaService.exchangeToken(
+        code,
+        user.stravaClientId,
+        user.stravaClientSecret
+      );
+
+    const athlete = await stravaService.getAthleteProfile(access_token);
+    const stravaId = athlete.id.toString();
 
     const existingStravaUser = await prisma.user.findUnique({
       where: { stravaId },
@@ -745,5 +789,74 @@ export const unlinkGoogle = async (req, res) => {
   } catch (error) {
     console.error('Error unlinking Google:', error);
     res.status(500).json({ error: 'Failed to unlink Google Calendar' });
+  }
+};
+
+// ==================== STRAVA CREDENTIALS ====================
+
+export const updateStravaCredentials = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { stravaClientId, stravaClientSecret } = req.body;
+
+    if (!stravaClientId || !stravaClientSecret) {
+      return res.status(400).json({ 
+        error: 'Strava Client ID i Client Secret są wymagane' 
+      });
+    }
+
+    // Walidacja formatu (podstawowa)
+    if (stravaClientId.trim().length < 5 || stravaClientSecret.trim().length < 10) {
+      return res.status(400).json({ 
+        error: 'Nieprawidłowy format Client ID lub Client Secret' 
+      });
+    }
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        stravaClientId: stravaClientId.trim(),
+        stravaClientSecret: stravaClientSecret.trim(),
+      },
+    });
+
+    res.json({
+      message: 'Dane Strava API zostały zapisane',
+      success: true,
+    });
+  } catch (error) {
+    console.error('Update Strava credentials error:', error);
+    res.status(500).json({ error: 'Nie udało się zapisać danych Strava API' });
+  }
+};
+
+export const getStravaCredentials = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        stravaClientId: true,
+        stravaClientSecret: true,
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'Użytkownik nie znaleziony' });
+    }
+
+    // Zwróć tylko informację czy są ustawione, nie same wartości (bezpieczeństwo)
+    res.json({
+      hasClientId: !!user.stravaClientId,
+      hasClientSecret: !!user.stravaClientSecret,
+      // Opcjonalnie można zwrócić zamaskowane wartości
+      clientIdPreview: user.stravaClientId 
+        ? `${user.stravaClientId.substring(0, 4)}...` 
+        : null,
+    });
+  } catch (error) {
+    console.error('Get Strava credentials error:', error);
+    res.status(500).json({ error: 'Nie udało się pobrać danych Strava API' });
   }
 };

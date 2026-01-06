@@ -95,6 +95,8 @@ export const authAPI = {
   updateProfile: (data) => api.patch("/auth/me", data),
   refresh: (refreshToken) => api.post("/auth/refresh", { refreshToken }),
   unlinkStrava: () => api.post("/auth/strava/unlink"),
+  updateStravaCredentials: (data) => api.put("/auth/strava/credentials", data),
+  getStravaCredentials: () => api.get("/auth/strava/credentials"),
   googleAuth: () => api.get("/auth/google"),
   unlinkGoogle: () => api.post("/auth/google/unlink"),
 

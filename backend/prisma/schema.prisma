@@ -16,6 +16,8 @@ model User {
   firstName            String?
   lastName             String?
   password             String
+  stravaClientId       String?
+  stravaClientSecret   String?
   stravaAccessToken    String?
   stravaRefreshToken   String?
   stravaTokenExpiresAt DateTime?

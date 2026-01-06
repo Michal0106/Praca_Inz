@@ -13,7 +13,7 @@ BigInt.prototype.toJSON = function () {
 };
 
 const app = express();
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 3001;
 
 app.use(
   cors({
@@ -34,7 +34,27 @@ app.use("/api/training-plan", trainingPlanRoutes);
 app.use("/api/goals", goalsRoutes);
 
 app.get("/api/health", (req, res) => {
-  res.json({ status: "OK", timestamp: new Date().toISOString() });
+  res.json({ 
+    status: "OK", 
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || "development",
+    version: "1.0.0"
+  });
+});
+
+app.get("/", (req, res) => {
+  res.json({ 
+    message: "TrainingApp API",
+    version: "1.0.0",
+    endpoints: {
+      health: "/api/health",
+      auth: "/api/auth/*",
+      activities: "/api/activities/*",
+      analytics: "/api/analytics/*",
+      trainingPlans: "/api/training-plan/*",
+      goals: "/api/goals/*"
+    }
+  });
 });
 
 app.use((err, req, res, next) => {
