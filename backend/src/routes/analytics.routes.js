@@ -14,6 +14,7 @@ import {
   getTimePatterns,
   getYearOverYear,
   getPerformanceCurve,
+  generateActivityComparisonSummary,
 } from "../controllers/analytics.controller.js";
 
 const router = express.Router();
@@ -24,6 +25,7 @@ router.get("/monthly-trends", authenticate, getMonthlyTrends);
 router.get("/intensity-distribution", authenticate, getIntensityDistribution);
 router.get("/progress", authenticate, getProgressOverTime);
 router.get("/compare", authenticate, compareActivities);
+router.get("/compare-summary", authenticate, generateActivityComparisonSummary);
 router.get("/fitness-metrics", authenticate, getFitnessMetrics);
 
 // Stage 3 analytics

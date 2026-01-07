@@ -191,6 +191,15 @@ export const syncActivities = async (req, res) => {
 
           newActivities.push(created);
           console.log(`Saved activity: ${activity.name} (ID: ${created.id})`);
+
+          if (['Run', 'VirtualRun', 'Ride', 'Swim'].includes(activity.type)) {
+            try {
+              await calculatePaceDistances(created.id, userId, accessToken, activity.id.toString());
+              console.log(`Calculated pace data for ${activity.name}`);
+            } catch (paceError) {
+              console.log(`Failed to calculate pace for ${activity.name}: ${paceError.message}`);
+            }
+          }
           } catch (detailError) {
             if (detailError.response?.status === 429) {
               console.log(`⚠️  Rate limit hit. Zapisuję podstawowe dane aktywności bez szczegółów.`);
@@ -224,6 +233,75 @@ export const syncActivities = async (req, res) => {
               console.error(`Error fetching details for ${activity.id}:`, detailError.message);
             }
           }
+      }
+
+
+      if (newActivities.length > 0) {
+        console.log(`Syncing best efforts for ${newActivities.length} new activities...`);
+        try {
+          const bestEffortsResult = await syncBestEffortsInternal(userId, accessToken, newActivities);
+          console.log(`Best efforts sync completed: ${bestEffortsResult.updated} updated`);
+        } catch (error) {
+          console.log(`Failed to sync best efforts: ${error.message}`);
+        }
+      }
+
+      try {
+        const existingActivitiesToUpdate = await prisma.activity.findMany({
+  where: {
+    userId,
+    source: "STRAVA",
+    type: { in: ["Run", "VirtualRun", "Ride", "Swim"] },
+  },
+  select: {
+    id: true,
+    externalId: true,
+    name: true,
+    type: true,
+    distance: true,
+    pacePerKm: true,
+    bestEfforts: true,
+    laps: true,
+  },
+  orderBy: { startDate: "desc" },
+  take: 200,
+});
+
+const isMissingArray = (v) => !Array.isArray(v) || v.length === 0;
+
+const needsAny = (a) =>
+  isMissingArray(a.pacePerKm) ||
+  isMissingArray(a.bestEfforts) ||
+  isMissingArray(a.laps);
+
+const toUpdate = existingActivitiesToUpdate.filter(needsAny);
+
+
+        if (existingActivitiesToUpdate.length > 0) {
+          console.log(`Found ${existingActivitiesToUpdate.length} existing activities to update with missing data...`);
+
+          const isMissingArray = (v) => !Array.isArray(v) || v.length === 0;
+
+          const activitiesMissingPace = existingActivitiesToUpdate.filter(a => isMissingArray(a.pacePerKm));
+          for (const activity of activitiesMissingPace) {
+            try {
+              await new Promise(resolve => setTimeout(resolve, 200));
+              await calculatePaceDistances(activity.id, userId, accessToken, activity.externalId);
+              console.log(`Updated pace data for existing activity: ${activity.name}`);
+            } catch (paceError) {
+              console.log(`Failed to update pace for ${activity.name}: ${paceError.message}`);
+            }
+          }
+
+          const activitiesMissingDetails = existingActivitiesToUpdate.filter(
+            a => isMissingArray(a.bestEfforts) || isMissingArray(a.laps));
+          if (activitiesMissingDetails.length > 0) {
+            const detailsResult = await syncBestEffortsInternal(userId, accessToken, activitiesMissingDetails);
+            console.log(`Updated details for ${detailsResult.updated} existing activities`);
+          }
+        }
+      } catch (updateError) {
+        console.log(`Failed to update existing activities: ${updateError.message}`);
       }
 
       await updateUserStats(userId);
@@ -344,51 +422,56 @@ export const recalculatePaceData = async (req, res) => {
     const activities = await prisma.activity.findMany({
       where: {
         userId,
-        type: { in: ["Run", "VirtualRun"] },
+        type: { in: ["Run", "VirtualRun", "Ride", "Swim"] },
       },
       orderBy: { startDate: "desc" },
     });
 
     console.log(`Found ${activities.length} running activities`);
 
-    let processed = 0;
-    let withPaceData = 0;
-    let errors = 0;
+let processed = 0;
+let saved = 0;
+let skipped = 0;
+let errors = 0;
 
-    for (const activity of activities) {
-      processed++;
+for (const activity of activities) {
+  processed++;
 
-      try {
-      await calculatePaceDistances(
-        activity.id,
-        userId,
-        accessToken,
-        activity.externalId,
-      );
-
-        withPaceData++;
-
-        if (processed % 10 === 0) {
-          console.log(`Progress: ${processed}/${activities.length}`);
-        }
-      } catch (error) {
-        errors++;
-        console.log(`Error for ${activity.name}: ${error.message}`);
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    }
-
-    console.log(
-      `Recalculation complete: ${withPaceData} with data, ${errors} errors`,
+  try {
+    const ok = await calculatePaceDistances(
+      activity.id,
+      userId,
+      accessToken,
+      activity.externalId,
     );
 
-    res.json({
-      message: "Pace data recalculated successfully",
-      processed,
-      withPaceData,
-      errors,
-    });
+    if (ok) saved++;
+    else skipped++;
+
+    if (processed % 10 === 0) {
+      console.log(`Progress: ${processed}/${activities.length} (saved: ${saved}, skipped: ${skipped}, errors: ${errors})`);
+    }
+  } catch (error) {
+    errors++;
+    console.log(`Error for ${activity.name}: ${error.message}`);
+
+    if (error.response?.status === 429) {
+      console.log(`Rate limit hit, stopping at processed=${processed}`);
+      break;
+    }
+  }
+
+  await new Promise((resolve) => setTimeout(resolve, 150));
+}
+
+res.json({
+  message: "Pace data recalculated successfully",
+  processed,
+  saved,
+  skipped,
+  errors,
+});
+
   } catch (error) {
     console.error("Recalculate pace data error:", error);
     res.status(500).json({
@@ -493,6 +576,59 @@ export const syncBestEfforts = async (req, res) => {
   }
 };
 
+
+async function syncBestEffortsInternal(userId, accessToken, activities) {
+  let updated = 0;
+  let skipped = 0;
+  let errors = 0;
+  let lapsUpdated = 0;
+
+  for (const activity of activities) {
+    try {
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      const detailedActivity = await stravaService.getActivity(
+        accessToken,
+        activity.externalId,
+      );
+
+      const updateData = {};
+      let hasUpdate = false;
+      
+      if (detailedActivity.best_efforts && detailedActivity.best_efforts.length > 0) {
+        updateData.bestEfforts = detailedActivity.best_efforts;
+        hasUpdate = true;
+      }
+      
+      if (detailedActivity.laps && detailedActivity.laps.length > 0) {
+        updateData.laps = detailedActivity.laps;
+        lapsUpdated++;
+        hasUpdate = true;
+      }
+      
+      if (hasUpdate) {
+        await prisma.activity.update({
+          where: { id: activity.id },
+          data: updateData,
+        });
+        updated++;
+        console.log(`✓ Updated ${activity.name} (BE: ${!!updateData.bestEfforts}, Laps: ${!!updateData.laps})`);
+      } else {
+        skipped++;
+      }
+    } catch (error) {
+      errors++;
+      console.error(`Error updating ${activity.name}:`, error.message);
+      
+      if (error.response?.status === 429) {
+        console.log(`Rate limit hit during best efforts sync.`);
+        break;
+      }
+    }
+  }
+
+  return { updated, skipped, lapsUpdated, errors };
+}
 
 async function updateUserStats(userId) {
   try {
@@ -626,191 +762,120 @@ async function calculatePowerCurve(
   }
 }
 
-async function calculatePaceDistances(
-  activityId,
-  userId,
-  accessToken,
-  stravaActivityId,
-) {
+async function calculatePaceDistances(activityId, userId, accessToken, stravaActivityId) {
   try {
     const streams = await stravaService.getActivityStreams(
       accessToken,
       stravaActivityId,
       ["distance", "time"],
     );
+
     console.log("STREAMS KEYS:", streams ? Object.keys(streams) : "NO STREAMS");
 
-    if (streams?.distance?.data && streams?.time?.data) {
-      const distances = streams.distance.data; 
-      const times = streams.time.data;      
+    if (!streams?.distance?.data || !streams?.time?.data) {
+      console.log(`No streams for activity ${activityId} (Strava ${stravaActivityId}) -> skip`);
+      return false;
+    }
 
+    const distances = streams.distance.data;
+    const times = streams.time.data;
 
-      const targetDistances = {
-        1000: "km1",
-        5000: "km5",
-        10000: "km10",
-        21097.5: "km21",
-        42195: "km42",
-      };
+    if (!Array.isArray(distances) || !Array.isArray(times) || distances.length === 0 || times.length === 0) {
+      return false;
+    }
 
-      const paceData = {};
+    const targetDistances = {
+      1000: "km1",
+      5000: "km5",
+      10000: "km10",
+      21097.5: "km21",
+      42195: "km42",
+    };
 
-      for (const [targetDist, fieldName] of Object.entries(targetDistances)) {
-        const targetMeters = parseFloat(targetDist);
-        const maxDist = distances[distances.length - 1];
+    const paceData = {};
 
-        if (targetMeters <= maxDist) {
-          let bestPace = Infinity;
+    for (const [targetDist, fieldName] of Object.entries(targetDistances)) {
+      const targetMeters = parseFloat(targetDist);
+      const maxDist = distances[distances.length - 1];
 
-          for (let i = 0; i < distances.length; i++) {
-            for (let j = i + 1; j < distances.length; j++) {
-              const dist = distances[j] - distances[i];
-              const time = times[j] - times[i];
+      if (targetMeters <= maxDist) {
+        let bestPace = Infinity;
 
-              if (
-                Math.abs(dist - targetMeters) / targetMeters < 0.02 &&
-                time > 0
-              ) {
-                const pace = time / 60 / (dist / 1000); 
+        for (let i = 0; i < distances.length; i++) {
+          for (let j = i + 1; j < distances.length; j++) {
+            const dist = distances[j] - distances[i];
+            const time = times[j] - times[i];
 
-                if (pace < bestPace && pace > 0 && pace < 20) {
-                  bestPace = pace;
-                }
-              }
+            if (Math.abs(dist - targetMeters) / targetMeters < 0.02 && time > 0) {
+              const pace = time / 60 / (dist / 1000); // min/km
+              if (pace < bestPace && pace > 0 && pace < 20) bestPace = pace;
             }
           }
-
-          if (bestPace < Infinity) {
-            paceData[fieldName] = Math.round(bestPace * 100) / 100;
-          }
-        }
-      }
-
-
-      const maxDist = distances[distances.length - 1];
-      const kmCount = Math.floor(maxDist / 1000);
-      const perKm = [];
-
-      let lastIndex = 0;
-      let lastDist = distances[0] || 0;
-      let lastTime = times[0] || 0;
-
-      for (let km = 1; km <= kmCount; km++) {
-        const targetMeters = km * 1000;
-
-        let j = lastIndex;
-        while (j < distances.length && distances[j] < targetMeters) {
-          j++;
-        }
-        if (j >= distances.length) break;
-
-        const distSegment = distances[j] - lastDist;
-        const timeSegment = times[j] - lastTime;
-
-        if (distSegment > 0 && timeSegment > 0) {
-          const pace = (timeSegment / 60) / (distSegment / 1000); 
-          if (pace > 0 && pace < 20) {
-            perKm.push(Math.round(pace * 100) / 100);
-          }
         }
 
-        lastIndex = j;
-        lastDist = distances[j];
-        lastTime = times[j];
-      }
-
-      if (Object.keys(paceData).length > 0) {
-        await prisma.paceDistance.upsert({
-          where: { activityId },
-          create: {
-            activityId,
-            userId,
-            ...paceData,
-          },
-          update: {
-            ...paceData,
-          },
-        });
-        console.log(`Calculated pace distances:`, paceData);
-      }
-
-      if (perKm.length > 0) {
-        await prisma.activity.update({
-          where: { id: activityId },
-          data: { pacePerKm: perKm },
-        });
-        console.log(`Saved pacePerKm array (${perKm.length} km)`);
-      }
-    } else {
-
-      console.log(
-        `No streams available, using activity average pace as fallback`,
-      );
-
-      const activity = await prisma.activity.findUnique({
-        where: { id: activityId },
-        select: { distance: true, duration: true },
-      });
-
-      if (activity && activity.distance > 0 && activity.duration > 0) {
-        const avgPace =
-          activity.duration / 60 / (activity.distance / 1000);
-        const paceData = {};
-
-        const targetDistances = {
-          1000: "km1",
-          5000: "km5",
-          10000: "km10",
-          21097.5: "km21",
-          42195: "km42",
-        };
-
-        for (const [targetDist, fieldName] of Object.entries(targetDistances)) {
-          if (parseFloat(targetDist) <= activity.distance) {
-            paceData[fieldName] = Math.round(avgPace * 100) / 100;
-          }
-        }
-
-
-        if (Object.keys(paceData).length > 0) {
-          await prisma.paceDistance.upsert({
-            where: { activityId },
-            create: {
-              activityId,
-              userId,
-              ...paceData,
-            },
-            update: {
-              ...paceData,
-            },
-          });
-          console.log(
-            `Saved fallback pace data (avg: ${avgPace.toFixed(2)} min/km):`,
-            paceData,
-          );
-        }
-
-        const kmCount = Math.floor(activity.distance / 1000);
-        if (kmCount > 0) {
-          const perKm = Array(kmCount).fill(
-            Math.round(avgPace * 100) / 100,
-          );
-          await prisma.activity.update({
-            where: { id: activityId },
-            data: { pacePerKm: perKm },
-          });
-          console.log(
-            `Saved fallback pacePerKm array (${kmCount} km, avg ${avgPace.toFixed(
-              2,
-            )} min/km)`,
-          );
+        if (bestPace < Infinity) {
+          paceData[fieldName] = Math.round(bestPace * 100) / 100;
         }
       }
     }
+
+    if (Object.keys(paceData).length > 0) {
+      await prisma.paceDistance.upsert({
+        where: { activityId },
+        create: { activityId, userId, ...paceData },
+        update: { ...paceData },
+      });
+      console.log(`Calculated pace distances:`, paceData);
+    }
+
+    // --- pacePerKm ---
+    const maxDist = distances[distances.length - 1];
+    const kmCount = Math.floor(maxDist / 1000);
+    const perKm = [];
+
+    let lastIndex = 0;
+    let lastDist = distances[0] || 0;
+    let lastTime = times[0] || 0;
+
+    for (let km = 1; km <= kmCount; km++) {
+      const targetMeters = km * 1000;
+
+      let j = lastIndex;
+      while (j < distances.length && distances[j] < targetMeters) j++;
+      if (j >= distances.length) break;
+
+      const distSegment = distances[j] - lastDist;
+      const timeSegment = times[j] - lastTime;
+
+      if (distSegment > 0 && timeSegment > 0) {
+        const pace = (timeSegment / 60) / (distSegment / 1000);
+        if (Number.isFinite(pace) && pace > 0 && pace < 20) {
+          perKm.push(Math.round(pace * 100) / 100);
+        }
+      }
+
+      lastIndex = j;
+      lastDist = distances[j];
+      lastTime = times[j];
+    }
+
+    if (perKm.length > 0) {
+      await prisma.activity.update({
+        where: { id: activityId },
+        data: { pacePerKm: perKm },
+      });
+      console.log(`Saved pacePerKm array (${perKm.length} km)`);
+      return true;
+    }
+
+    return false;
   } catch (error) {
-    console.error("Error calculating pace distances:", error.message);
+    
+    console.error("Error calculating pace distances:", error?.message || error);
+    throw error;
   }
 }
+
 
 
 async function calculateFitnessMetrics(userId) {

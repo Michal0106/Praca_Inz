@@ -6,7 +6,7 @@ const ollamaClient = new OpenAI({
   apiKey: 'ollama', 
 });
 
-const MODEL_NAME = 'qwen2.5-optimized';
+const MODEL_NAME = 'qwen2.5:7b'; //'qwen2.5-optimized'
 
 class OpenAIService {
   async generateTrainingPlan(userAnalysis, preferences) {
@@ -564,6 +564,64 @@ OUTPUT ONLY VALID JSON!
       return `${hours}:${minutes.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
     }
     return `${minutes}:${secs.toString().padStart(2, "0")}`;
+  }
+
+  async generateActivityComparisonSummary(firstActivity, secondActivity) {
+    try {
+      console.log('[Ollama] Generating activity comparison summary...');
+
+      const prompt = `
+Jesteś ekspertem sportowym. Przeanalizuj dwie aktywności i podaj ZWIĘZŁE podsumowanie porównawcze.
+
+AKTYWNOŚĆ 1: ${firstActivity.type} - ${(firstActivity.distance / 1000).toFixed(1)}km, ${this.formatTime(firstActivity.duration)}, tempo: ${firstActivity.paceStats?.meanPace ? firstActivity.paceStats.meanPace.toFixed(2) + ' min/km' : 'brak'}
+AKTYWNOŚĆ 2: ${secondActivity.type} - ${(secondActivity.distance / 1000).toFixed(1)}km, ${this.formatTime(secondActivity.duration)}, tempo: ${secondActivity.paceStats?.meanPace ? secondActivity.paceStats.meanPace.toFixed(2) + ' min/km' : 'brak'}
+
+Dane tempa Aktywność 1: ${firstActivity.pacePerKm ? firstActivity.pacePerKm.slice(0, 5).map((p, i) => `${i+1}km: ${p.toFixed(2)}`).join(', ') + (firstActivity.pacePerKm.length > 5 ? '...' : '') : 'brak'}
+Dane tempa Aktywność 2: ${secondActivity.pacePerKm ? secondActivity.pacePerKm.slice(0, 5).map((p, i) => `${i+1}km: ${p.toFixed(2)}`).join(', ') + (secondActivity.pacePerKm.length > 5 ? '...' : '') : 'brak'}
+
+Strefy tempa A1: ${firstActivity.paceZones ? Object.entries(firstActivity.paceZones.zones).map(([z, d]) => `${z}:${d.percent.toFixed(0)}%`).join(', ') : 'brak'}
+Strefy tempa A2: ${secondActivity.paceZones ? Object.entries(secondActivity.paceZones.zones).map(([z, d]) => `${z}:${d.percent.toFixed(0)}%`).join(', ') : 'brak'}
+
+NAPISZ ZWIĘZŁE PODSUMOWANIE (max 400 słów) zawierające:
+• Która aktywność była lepsza i dlaczego
+• Kluczowe różnice w tempie i wysiłku
+• Mocne i słabe strony każdej aktywności
+• 2-3 konkretne rady na przyszłość
+
+NIE POWTARZAJ danych liczbowych już widocznych w interfejsie. Skup się na analizie i wnioskach. Bazuj tylko na prawdziwych dostarczonych danych.
+Nie zgaduj i nie dodawaj informacji, których nie ma w danych na przykład o warunkach pogodowych czy trasie. Natomiast możesz nadmienić, że dany wynik mógł być spowodowany pogoda czy temperaturą.
+Odpowiedź po polsku, profesjonalna ale przystępna.
+`;
+
+      const response = await ollamaClient.chat.completions.create({
+        model: MODEL_NAME,
+        messages: [
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        temperature: 0.5,
+        max_tokens: 800,
+      });
+
+      const summary = response.choices[0]?.message?.content || "Nie udało się wygenerować podsumowania.";
+
+      console.log('[Ollama] Activity comparison summary generated successfully');
+      return summary;
+
+    } catch (error) {
+      console.error("Ollama API error for activity comparison:", error);
+      
+      if (error.code === 'ECONNREFUSED') {
+        throw new Error(
+          'Ollama is not running. Please start Ollama with: ollama serve\n' +
+          'Then make sure you have the model installed: ollama pull qwen2.5'
+        );
+      }
+      
+      throw new Error("Failed to generate activity comparison summary: " + error.message);
+    }
   }
 }
 
