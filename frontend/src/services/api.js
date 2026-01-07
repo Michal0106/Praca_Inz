@@ -152,6 +152,8 @@ export const analyticsAPI = {
     api.get("/analytics/progress", { params: { metric, period } }),
   compareActivities: (firstId, secondId) =>
     api.get("/analytics/compare", { params: { firstId, secondId } }),
+  generateActivityComparisonSummary: (firstId, secondId) =>
+    api.get("/analytics/compare-summary", { params: { firstId, secondId } }),
   getFitnessMetrics: (params) => api.get("/analytics/fitness-metrics", { params }),
 
   // Stage 3 analytics (accordion panels)

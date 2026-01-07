@@ -1,5 +1,6 @@
 import prisma from "../config/database.js";
 import { getUserId } from "../utils/auth.utils.js";
+import { openaiService } from "../services/openai.service.js";
 
 
 
@@ -1238,5 +1239,93 @@ export const getPerformanceCurve = async (req, res) => {
   } catch (error) {
     console.error("Get performance curve error:", error);
     res.status(500).json({ error: "Failed to fetch performance curve" });
+  }
+};
+
+export const generateActivityComparisonSummary = async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    const { firstId, secondId } = req.query;
+
+    if (!firstId || !secondId) {
+      return res
+        .status(400)
+        .json({ error: "Both firstId and secondId are required" });
+    }
+
+    const activities = await prisma.activity.findMany({
+      where: {
+        userId,
+        id: { in: [firstId, secondId] },
+      },
+      include: {
+        paceDistance: true,
+      },
+    });
+
+    if (activities.length !== 2) {
+      return res
+        .status(404)
+        .json({ error: "One or both activities not found" });
+    }
+
+    const mapById = Object.fromEntries(
+      activities.map((a) => [a.id, a]),
+    );
+
+    const first = mapById[firstId];
+    const second = mapById[secondId];
+
+    const formatActivity = (a) => {
+      const pacePerKm = Array.isArray(a.pacePerKm) ? a.pacePerKm : null;
+
+      return {
+        id: a.id,
+        name: a.name,
+        type: a.type,
+        startDate: a.startDate,
+        duration: a.duration,
+        distance: a.distance,
+        averageHeartRate: a.averageHeartRate,
+        maxHeartRate: a.maxHeartRate,
+        averageSpeed: a.averageSpeed,
+        maxSpeed: a.maxSpeed,
+        elevationGain: a.elevationGain,
+        calories: a.calories,
+        trainingLoad: computeTrainingLoad(a),
+        paceDistance: a.paceDistance
+          ? {
+              km1: a.paceDistance.km1,
+              km5: a.paceDistance.km5,
+              km10: a.paceDistance.km10,
+              km21: a.paceDistance.km21,
+              km42: a.paceDistance.km42,
+            }
+          : null,
+        pacePerKm,
+        paceStats: computePaceStats(pacePerKm),
+        paceZones: computePaceZones(pacePerKm),
+        climbMetrics: computeClimbMetrics(a),
+      };
+    };
+
+    const firstFormatted = formatActivity(first);
+    const secondFormatted = formatActivity(second);
+
+    console.log("Generating AI summary for activities:", first.name, "vs", second.name);
+
+    const summary = await openaiService.generateActivityComparisonSummary(firstFormatted, secondFormatted);
+
+    res.json({
+      summary,
+      activities: {
+        first: firstFormatted,
+        second: secondFormatted,
+      },
+    });
+
+  } catch (error) {
+    console.error("Generate activity comparison summary error:", error);
+    res.status(500).json({ error: "Failed to generate activity comparison summary" });
   }
 };

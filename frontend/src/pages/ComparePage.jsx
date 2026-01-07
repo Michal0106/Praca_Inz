@@ -24,6 +24,8 @@ function ComparePage() {
   const [loadingActivities, setLoadingActivities] = useState(true);
   const [loadingCompare, setLoadingCompare] = useState(false);
   const [error, setError] = useState(null);
+  const [aiSummary, setAiSummary] = useState(null);
+  const [loadingAISummary, setLoadingAISummary] = useState(false);
 
   const navigate = useNavigate();
 
@@ -59,6 +61,7 @@ function ComparePage() {
     try {
       const { data } = await analyticsAPI.compareActivities(firstId, secondId);
       setComparison(data);
+      setAiSummary(null); // Reset AI summary when new comparison is loaded
     } catch (err) {
       if (err.response?.status === 401) {
         navigate("/");
@@ -67,6 +70,24 @@ function ComparePage() {
       }
     } finally {
       setLoadingCompare(false);
+    }
+  };
+
+  const handleGenerateAISummary = async () => {
+    if (!firstId || !secondId) return;
+    
+    setLoadingAISummary(true);
+    try {
+      const { data } = await analyticsAPI.generateActivityComparisonSummary(firstId, secondId);
+      setAiSummary(data.summary);
+    } catch (err) {
+      if (err.response?.status === 401) {
+        navigate("/");
+      } else {
+        setError("Nie udało się wygenerować podsumowania AI");
+      }
+    } finally {
+      setLoadingAISummary(false);
     }
   };
 
@@ -590,6 +611,13 @@ function ComparePage() {
                     </option>
                   ))}
                 </select>
+                {firstId && (
+                  <div className="selected-activity-info">
+                    <span className="activity-type">
+                      {activities.find(a => a.id === firstId)?.type || "Nieznany typ"}
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div className="compare-select">
@@ -608,6 +636,13 @@ function ComparePage() {
                     </option>
                   ))}
                 </select>
+                {secondId && (
+                  <div className="selected-activity-info">
+                    <span className="activity-type">
+                      {activities.find(a => a.id === secondId)?.type || "Nieznany typ"}
+                    </span>
+                  </div>
+                )}
               </div>
 
                 <div className="compare-actions">
@@ -902,6 +937,40 @@ function ComparePage() {
                 Podświetlenie oznacza lepszą wartość dla danego parametru
                 (np. krótszy czas, większy dystans, wyższa prędkość).
               </p>
+            </div>
+
+            {/* AI Summary Section */}
+            <div className="compare-section compare-ai-section">
+              <h3>Podsumowanie AI</h3>
+              <p className="compare-description">
+                AI analizuje obie aktywności i podaje szczegółowe porównanie, spostrzeżenia oraz rekomendacje.
+              </p>
+              
+              {!aiSummary && (
+                <button 
+                  onClick={handleGenerateAISummary}
+                  disabled={loadingAISummary}
+                  className="compare-ai-button"
+                >
+                  {loadingAISummary ? "Generowanie podsumowania..." : "Wygeneruj podsumowanie AI"}
+                </button>
+              )}
+              
+              {aiSummary && (
+                <div className="ai-summary-content">
+                  <div className="ai-summary-text">
+                    {aiSummary.split('\n').map((line, index) => (
+                      <p key={index}>{line}</p>
+                    ))}
+                  </div>
+                  <button 
+                    onClick={() => setAiSummary(null)}
+                    className="compare-ai-regenerate-button"
+                  >
+                    Wygeneruj ponownie
+                  </button>
+                </div>
+              )}
             </div>
           </>
         )}
