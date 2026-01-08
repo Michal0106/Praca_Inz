@@ -91,6 +91,7 @@ model Activity {
   intensityFactor  Float?
   normalizedPower  Int?
   pacePerKm        Json?            @db.Json
+  avgPaceMinPerKm  Float?
   tss              Float?
   bestEfforts      Json?            @db.Json
   laps             Json?            @db.Json
@@ -105,6 +106,8 @@ model Activity {
   @@unique([userId, externalId, source])
   @@index([userId])
   @@index([startDate])
+  @@index([userId, startDate])
+  @@index([userId, type, startDate])
 }
 
 model GpsPoint {
@@ -321,6 +324,7 @@ model TrainingPlan {
 
   @@index([userId])
   @@index([status])
+  @@index([userId, status])
 }
 
 model PlanWeek {
