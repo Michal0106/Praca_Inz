@@ -142,6 +142,10 @@ export const activitiesAPI = {
   batchFetchDetailsRange: (payload) => api.post("/activities/batch-fetch-details-range", payload),
 };
 
+export const aiAPI = {
+  chat: (prompt) => api.post('/ai/chat', { prompt }),
+};
+
 export const analyticsAPI = {
   getDistribution: () => api.get("/analytics/distribution"),
   getWeeklyStats: (params) => api.get("/analytics/weekly-stats", { params }),

@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { Home, BarChart3, Trophy, Calendar, User, GitCompare, ListChecks } from "lucide-react";
+import { Home, BarChart3, Trophy, Calendar, User, GitCompare, ListChecks, MessageSquare } from "lucide-react";
 import "./Layout.css";
 
 function Layout({ children }) {
@@ -13,6 +13,7 @@ function Layout({ children }) {
     // { path: "/training-plan", icon: Calendar, label: "Plan treningowy" },
     { path: "/training-plans", icon: ListChecks, label: "Moje plany" },
     { path: "/compare", icon: GitCompare, label: "Porównaj" },
+    { path: "/ai", icon: MessageSquare, label: "AI" },
     { path: "/account", icon: User, label: "Moje konto" },
   ];
 
