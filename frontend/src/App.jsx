@@ -17,6 +17,7 @@ import ComparePage from "./pages/ComparePage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import GoalsPage from "./pages/GoalsPage";
+import AIChatPage from "./pages/AIChatPage";
 
 
 function App() {
@@ -67,6 +68,7 @@ function App() {
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/goals" element={<GoalsPage />} />
+          <Route path="/ai" element={<AIChatPage />} />
         </Routes>
       </FilterProvider>
     </Router>

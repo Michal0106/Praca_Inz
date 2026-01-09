@@ -590,10 +590,11 @@ NAPISZ ZWIĘZŁE PODSUMOWANIE (max 400 słów) zawierające:
 • Mocne i słabe strony każdej aktywności
 • 2-3 konkretne rady na przyszłość, najlepiej nieoczywiste.
 
+
 Jeśli chcesz zawrzeć informację o tempach to podawaj ją w formacie "X:XX min/km".
-NIE POWTARZAJ danych liczbowych już widocznych w interfejsie. Skup się na analizie i wnioskach. Bazuj tylko na prawdziwych dostarczonych danych.
+Skup się na analizie i wnioskach. Bazuj tylko na prawdziwych dostarczonych danych.
 Nie zgaduj i nie dodawaj informacji, których nie ma w danych na przykład o warunkach pogodowych czy trasie. Natomiast możesz nadmienić, że dany wynik mógł być spowodowany pogoda czy temperaturą.
-Weź pod uwagę, że aktywności mogą mieć różne dystanse i czasy trwania. Spróbuj je ujednolicić w analizie.
+Weź pod uwagę, że aktywności mogą mieć różne dystanse i czasy trwania. Spróbuj je ujednolicić w analizie. Nie zawsze bieg który trwał krócej jest lepszy!
 Odpowiedź po polsku, profesjonalna ale przystępna.
 `;
 
@@ -625,6 +626,35 @@ Odpowiedź po polsku, profesjonalna ale przystępna.
       }
       
       throw new Error("Failed to generate activity comparison summary: " + error.message);
+    }
+  }
+
+  async chat(prompt, options = {}) {
+    try {
+      const messages = [
+        {
+          role: "system",
+          content:
+            "Jesteś ekspertem biegowym i pomocnym asystentem. Odpowiadaj rzeczowo i po polsku, uwzględniając tylko dane płynące z kontekstu (dane o przesłanych aktywnościach) Bierz pod uwagę DATY aktywności, bierz pod uwagę DYSTANSE aktywności, bierz pod uwagę resztę danych jakie dostajesz.",
+        },
+        { role: "user", content: prompt },
+      ];
+
+      const response = await ollamaClient.chat.completions.create({
+        model: MODEL_NAME,
+        messages,
+        temperature: options.temperature ?? 0.7,
+        max_tokens: options.max_tokens ?? 800,
+      });
+
+      const content = response.choices[0]?.message?.content || "";
+      return content;
+    } catch (error) {
+      console.error("Ollama chat error:", error);
+      if (error.code === "ECONNREFUSED") {
+        throw new Error('Ollama is not running. Start with: ollama serve');
+      }
+      throw error;
     }
   }
 }

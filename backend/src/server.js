@@ -7,6 +7,7 @@ import analyticsRoutes from "./routes/analytics.routes.js";
 import dataRoutes from "./routes/data.routes.js";
 import trainingPlanRoutes from "./routes/trainingPlan.routes.js";
 import goalsRoutes from "./routes/goals.routes.js";
+import aiRoutes from "./routes/ai.routes.js";
 
 BigInt.prototype.toJSON = function () {
   return Number(this);
@@ -32,6 +33,7 @@ app.use("/api/data", dataRoutes);
 app.use("/api/training-plan", trainingPlanRoutes);
 
 app.use("/api/goals", goalsRoutes);
+app.use("/api/ai", aiRoutes);
 
 app.get("/api/health", (req, res) => {
   res.json({ 
