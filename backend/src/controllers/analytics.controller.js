@@ -616,6 +616,7 @@ export const compareActivities = async (req, res) => {
             }
           : null,
         pacePerKm,
+        avgPaceMinPerKm: a.avgPaceMinPerKm,
         paceStats: computePaceStats(pacePerKm),
         paceZones: computePaceZones(pacePerKm),
         climbMetrics: computeClimbMetrics(a),

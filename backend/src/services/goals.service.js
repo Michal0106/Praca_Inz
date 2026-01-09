@@ -6,54 +6,37 @@ function round1(x) {
 }
 
 export async function computeGoalProgress(userId, goal) {
-  const activities = await prisma.activity.findMany({
-    where: {
-      userId,
-      startDate: {
-        gte: goal.windowStart,
-        lt: goal.windowEnd,
-      },
-    },
-    select: {
-      distance: true,
-      duration: true,
-      elevationGain: true,
-      type: true,
-    },
-  });
+  // SQL
+  const results = await prisma.$queryRaw`
+    SELECT * FROM compute_goal_progress(${userId}, ${goal.id})
+  `;
 
-  const totalDistanceKm = activities.reduce((s, a) => s + (a.distance || 0), 0) / 1000;
-  const totalDurationMin = activities.reduce((s, a) => s + (a.duration || 0), 0) / 60;
-  const totalElevationM = activities.reduce((s, a) => s + (a.elevationGain || 0), 0);
-  const totalActivities = activities.length;
+  if (!results || results.length === 0) {
+    throw new Error('Failed to compute goal progress');
+  }
 
-  let current = 0;
+  const row = results[0];
+  const current = Number(row.current_value);
+  const target = Number(row.target_value);
+  const percent = Number(row.progress_percent);
+
   let unit = "";
-
   switch (goal.type) {
     case "DISTANCE_KM":
-      current = totalDistanceKm;
       unit = "km";
       break;
     case "DURATION_MIN":
-      current = totalDurationMin;
       unit = "min";
       break;
     case "ELEVATION_M":
-      current = totalElevationM;
       unit = "m";
       break;
     case "ACTIVITIES_COUNT":
-      current = totalActivities;
       unit = "treningów";
       break;
     default:
-      current = 0;
       unit = "";
   }
-
-  const target = goal.target;
-  const percent = target > 0 ? Math.min(100, Math.floor((current / target) * 100)) : 0;
 
   return {
     current: round1(current),
@@ -63,10 +46,10 @@ export async function computeGoalProgress(userId, goal) {
     windowStart: goal.windowStart,
     windowEnd: goal.windowEnd,
     totals: {
-      totalDistanceKm: round1(totalDistanceKm),
-      totalDurationMin: round1(totalDurationMin),
-      totalElevationM: round1(totalElevationM),
-      totalActivities,
+      totalDistanceKm: round1(Number(row.total_distance_km)),
+      totalDurationMin: round1(Number(row.total_duration_min)),
+      totalElevationM: round1(Number(row.total_elevation_m)),
+      totalActivities: Number(row.total_activities),
     },
   };
 }
@@ -77,7 +60,6 @@ export async function closeExpiredGoalIfNeeded(userId, goal) {
 
   if (now >= goal.windowEnd) {
     const progress = await computeGoalProgress(userId, goal);
-
     const isCompleted = progress.current >= progress.target;
 
     return prisma.goal.update({
@@ -97,24 +79,36 @@ export async function createNewGoal(userId, { type, period, target }) {
   const now = new Date();
   const { windowStart, windowEnd } = getWindow(period, now);
 
-  await prisma.goal.updateMany({
-    where: { userId, isActive: true },
-    data: { isActive: false },
-  });
+  // SQL
+await prisma.$executeRaw`
+  CALL create_new_goal(
+    ${userId}::text,
+    ${type}::text,
+    ${period}::text,
+    ${target}::decimal,
+    ${windowStart}::timestamp,
+    ${windowEnd}::timestamp
+  )
+`;
 
-  const goal = await prisma.goal.create({
-    data: {
+
+  // nowy goal
+  const goal = await prisma.goal.findFirst({
+    where: {
       userId,
+      isActive: true,
       type,
       period,
-      target,
-      isActive: true,
-      windowStart,
-      windowEnd,
-      isCompleted: null,
-      completedAt: null,
+      //target,
+      //windowStart,
+      //windowEnd,
     },
+    orderBy: { createdAt: 'desc' },
   });
+
+  if (!goal) {
+    throw new Error('Failed to create new goal');
+  }
 
   return goal;
 }

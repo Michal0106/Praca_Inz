@@ -260,6 +260,7 @@ export const syncActivities = async (req, res) => {
     type: true,
     distance: true,
     pacePerKm: true,
+    avgPaceMinPerKm: true,
     bestEfforts: true,
     laps: true,
   },
@@ -858,23 +859,41 @@ async function calculatePaceDistances(activityId, userId, accessToken, stravaAct
       lastDist = distances[j];
       lastTime = times[j];
     }
+    const avgPaceMinPerKm = avgPaceFromPerKm(perKm);
 
-    if (perKm.length > 0) {
+    //if (perKm.length > 0) {
       await prisma.activity.update({
         where: { id: activityId },
-        data: { pacePerKm: perKm },
+        data: { 
+          pacePerKm: perKm,
+          avgPaceMinPerKm },
       });
-      console.log(`Saved pacePerKm array (${perKm.length} km)`);
-      return true;
-    }
+console.log("pace calc", {
+  activityId,
+  stravaActivityId,
+  maxDist: distances?.[distances.length - 1],
+  kmCount,
+  perKmLen: perKm.length,
+  avgPaceMinPerKm,
+});
 
-    return false;
   } catch (error) {
     
     console.error("Error calculating pace distances:", error?.message || error);
     throw error;
   }
 }
+
+function avgPaceFromPerKm(perKm) {
+  if (!Array.isArray(perKm) || perKm.length === 0) return null;
+
+  const valid = perKm.filter((v) => Number.isFinite(v) && v > 0 && v < 20);
+  if (valid.length === 0) return null;
+
+  const mean = valid.reduce((s, v) => s + v, 0) / valid.length;
+  return Math.round(mean * 100) / 100;
+}
+
 
 
 
@@ -989,6 +1008,10 @@ export const fetchActivityDetails = async (req, res) => {
       await calculatePaceDistances(activity.id, userId, accessToken, activity.externalId);
     }
 
+    const fresh = await prisma.activity.findFirst({
+      where: { id, userId },
+    });
+
     if (activity.averagePower && activity.averagePower > 0) {
       await calculatePowerCurve(
         activity.id,
@@ -1003,7 +1026,7 @@ export const fetchActivityDetails = async (req, res) => {
 
     res.json({
       message: "Activity details fetched successfully",
-      activity: updated,
+      activity: fresh,
     });
   } catch (error) {
     console.error("Fetch activity details error:", error);

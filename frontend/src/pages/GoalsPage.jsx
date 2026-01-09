@@ -25,7 +25,7 @@ const periodLabel = (p) => (p === "WEEK" ? "Tydzień" : "Miesiąc");
 function statusBadge(goal) {
   if (goal.isActive) return { text: "W trakcie", cls: "badge badge-live" };
   if (goal.isCompleted === true) return { text: "Zaliczony", cls: "badge badge-ok" };
-  if (goal.isCompleted === false) return { text: "Nie zaliczony", cls: "badge badge-bad" };
+  if (goal.isCompleted === false) return { text: "Niezaliczony", cls: "badge badge-bad" };
   return { text: "Zakończony", cls: "badge" };
 }
 
