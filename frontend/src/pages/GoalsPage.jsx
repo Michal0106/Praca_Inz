@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Flame } from "lucide-react";
 import Layout from "../components/Layout";
 import { goalsAPI } from "../services/api";
 import "./GoalsPage.css";
@@ -76,7 +77,11 @@ export default function GoalsPage() {
   return (
     <Layout>
       <div className="goals-page">
-        <h1 className="goals-title">Cele i postęp</h1>
+        <div className="goals-header">
+          <Flame size={32} className="goals-header-icon" />
+          <h1 className="goals-title">Cele i postęp</h1>
+        </div>
+
 
         {loading && <p>Ładowanie...</p>}
         {error && <p className="goals-error">{error}</p>}

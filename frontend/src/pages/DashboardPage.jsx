@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { RefreshCw, LogOut } from "lucide-react";
+import { RefreshCw, LogOut, Home } from "lucide-react";
 import Layout from "../components/Layout";
 import GlobalFilters from "../components/GlobalFilters";
 import ActivityModal from "../components/ActivityModal";
@@ -278,7 +278,11 @@ if (params.get("auth") === "success") {
       <div className="dashboard-page">
         <div className="dashboard-header">
           <div>
-            <h1>Panel główny</h1>
+            <div className="dashboard-title-row">
+              <Home size={32} className="dashboard-title-icon" />
+              <h1 className="dashboard-title">Panel główny</h1>
+            </div>
+            
             <p className="user-email">
               {user?.email}
               {user?.hasStravaData && (

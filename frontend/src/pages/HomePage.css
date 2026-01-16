@@ -82,14 +82,14 @@ h1 {
 
 .features {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 2rem;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 1.5rem;
   margin-top: 3rem;
 }
 
 .feature-card {
   background: rgba(255, 255, 255, 0.95);
-  padding: 2rem;
+  padding: 1.25rem;
   border-radius: 16px;
   text-align: center;
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
@@ -102,19 +102,21 @@ h1 {
 
 .feature-card svg {
   color: #667eea;
-  margin-bottom: 1rem;
+  margin-bottom: 0.75rem;
+  width: 32px;
+  height: 32px;
 }
 
 .feature-card h3 {
-  font-size: 1.5rem;
+  font-size: 1.1rem;
   color: #333;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.5rem;
 }
 
 .feature-card p {
   color: #666;
-  font-size: 1rem;
-  line-height: 1.6;
+  font-size: 0.875rem;
+  line-height: 1.5;
 }
 
 @media (max-width: 768px) {

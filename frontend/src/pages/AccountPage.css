@@ -503,6 +503,26 @@
   animation: spin 1s linear infinite;
 }
 
+
+
+.account-header-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.account-header-icon {
+  color: #667eea;
+  margin-top: -60px;
+  flex-shrink: 0;
+}
+
+.account-header-title {
+  margin: 0;
+}
+
+
+
 @keyframes spin {
   from {
     transform: rotate(0deg);

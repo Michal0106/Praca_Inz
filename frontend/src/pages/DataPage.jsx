@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Award, TrendingUp, Activity as ActivityIcon } from "lucide-react";
+import { Award, TrendingUp, Activity as ActivityIcon, Database } from "lucide-react";
 import Layout from "../components/Layout";
 import GlobalFilters from "../components/GlobalFilters";
 import ActivityModal from "../components/ActivityModal";
@@ -156,10 +156,12 @@ function DataPage() {
 
   return (
     <Layout>
-      <div className="data-page">
-        <div className="page-header">
-          <h1>Szczegółowe dane</h1>
-        </div>
+        <div className="data-page">
+          <div className="data-header">
+            <Database size={32} className="data-header-icon" />
+            <h1 className="data-header-title">Szczegółowe dane</h1>
+          </div>
+
 
         <GlobalFilters />
 

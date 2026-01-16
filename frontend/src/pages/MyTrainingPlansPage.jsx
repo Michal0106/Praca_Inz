@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Calendar, Target, TrendingUp, Trash2 } from "lucide-react";
+import { Plus, Calendar, Target, TrendingUp, Trash2, ListChecks } from "lucide-react";
 import Layout from "../components/Layout";
 import { trainingPlanAPI } from "../services/api";
 import "./MyTrainingPlansPage.css";
@@ -115,7 +115,11 @@ function MyTrainingPlansPage() {
       <div className="my-plans-page">
         <div className="page-header">
           <div>
-            <h1>Moje plany treningowe</h1>
+            <div className="plans-title-row">
+              <ListChecks size={32} className="plans-title-icon" />
+              <h1>Moje plany treningowe</h1>
+            </div>
+
             <p className="subtitle">
               Zarządzaj swoimi planami treningowymi wygenerowanymi przez AI
             </p>

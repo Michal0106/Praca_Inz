@@ -136,6 +136,23 @@
     }
 
 
+.chat-header-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+.chat-header-icon {
+      color: #667eea;
+      flex-shrink: 0;
+    }
+
+.chat-header-title {
+      margin: 0;
+    }
+
+
+
 @keyframes bounce {
     0%, 80%, 100% {
         opacity: 0.3;

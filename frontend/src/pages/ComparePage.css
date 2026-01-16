@@ -465,3 +465,19 @@
   border-color: #9ca3af;
 }
 
+
+.compare-icon {
+  color: #667eea;
+  margin-top: 6px;
+}
+.compare-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.compare-title--no-margin {
+  margin: 0;
+}
+

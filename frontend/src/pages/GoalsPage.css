@@ -8,6 +8,7 @@
   font-size: 28px;
   font-weight: 800;
   margin-bottom: 14px;
+  color: #111827;
 }
 
 .goals-error {
@@ -142,7 +143,7 @@
   font-size: 0.92rem;
 }
 
-.form-row {
+.goals-page .form-row {
   display: grid;
   grid-template-columns: 1.2fr 0.8fr 0.8fr 0.8fr;
   gap: 10px;
@@ -150,7 +151,7 @@
 }
 
 @media (max-width: 900px) {
-  .form-row { grid-template-columns: 1fr 1fr; }
+  .goals-page .form-row { grid-template-columns: 1fr 1fr; }
 }
 
 .field label {
@@ -246,3 +247,18 @@ button.primary:disabled {
   border-color: #fecaca;
   color: #991b1b;
 }
+
+
+.goals-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.goals-header-icon {
+  color: #667eea;
+  margin-top: -2px;
+  flex-shrink: 0;
+}
+

@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { GitCompare } from "lucide-react";
 import Layout from "../components/Layout";
 import { activitiesAPI, analyticsAPI } from "../services/api";
 import {
@@ -61,7 +62,7 @@ function ComparePage() {
     try {
       const { data } = await analyticsAPI.compareActivities(firstId, secondId);
       setComparison(data);
-      setAiSummary(null); // Reset AI summary when new comparison is loaded
+      setAiSummary(null); 
     } catch (err) {
       if (err.response?.status === 401) {
         navigate("/");
@@ -522,7 +523,12 @@ function ComparePage() {
   return (
     <Layout>
       <div className="compare-page">
-        <h1 className="compare-title">Porównaj treningi</h1>
+      <div className="compare-header">
+        <GitCompare size={32} className="compare-icon" />
+        <h1 className="compare-title compare-title--no-margin">Porównaj treningi</h1>
+      </div>
+
+
 
         <div className="compare-card">
           {loadingActivities && <p>Ładowanie listy aktywności...</p>}

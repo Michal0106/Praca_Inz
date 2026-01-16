@@ -9,6 +9,7 @@ import {
   Calendar,
   CheckCircle,
   Edit2,
+  Settings,
 } from "lucide-react";
 import Layout from "../components/Layout";
 import { useAuth } from "../hooks/useAuth";
@@ -283,10 +284,16 @@ function AccountPage() {
           </div>
         )}
 
-        <div className="account-header">
-          <h1>Moje konto</h1>
-          <p className="subtitle">Zarządzaj swoim kontem i połączeniami</p>
-        </div>
+<div className="account-header">
+  <div className="account-header-row">
+    <Settings size={32} className="account-header-icon" />
+    <div className="account-header-text">
+      <h1 className="account-header-title">Moje konto</h1>
+      <p className="subtitle">Zarządzaj swoim kontem i połączeniami</p>
+    </div>
+  </div>
+</div>
+
 
         <div className="account-content">
           <div className="account-section">
