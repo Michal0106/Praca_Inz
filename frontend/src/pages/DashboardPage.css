@@ -410,3 +410,23 @@
 }
 
 
+
+.dashboard-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.dashboard-title-icon {
+  color: #667eea;
+  margin-top: -2px;
+  flex-shrink: 0;
+}
+
+.dashboard-title {
+  font-size: 2rem;
+  color: #333;
+}
+
+

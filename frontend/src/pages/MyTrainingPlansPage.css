@@ -225,6 +225,21 @@
   margin-bottom: 1.5rem;
 }
 
+
+.plans-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.plans-title-icon {
+  color: #667eea;
+  margin-top: -5px;
+  flex-shrink: 0;
+}
+
+
 @media (max-width: 768px) {
   .my-plans-page {
     padding: 1rem;

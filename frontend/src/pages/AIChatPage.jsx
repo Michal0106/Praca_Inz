@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { Bot } from "lucide-react";
 import Layout from "../components/Layout";
 import { aiAPI } from "../services/api";
 import "./AIChatPage.css";
@@ -49,9 +50,15 @@ export default function AIChatPage() {
       <div className="ai-chat-grid">
         <div className="chat-panel">
           <div className="chat-header">
-            <h2>AI Coach</h2>
-            <div className="chat-sub">Zapytaj AI o ocenę na podstawie Twoich aktywności</div>
+            <div className="chat-header-row">
+              <Bot size={28} className="chat-header-icon" />
+              <h2 className="chat-header-title">AI Coach</h2>
+            </div>
+            <div className="chat-sub">
+              Zapytaj AI o ocenę na podstawie Twoich aktywności
+            </div>
           </div>
+
 
           <div className="chat-window" ref={chatRef}>
             {messages.length === 0 && (

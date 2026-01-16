@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { Zap } from "lucide-react";
 import { authAPI } from "../services/api";
 import "./AuthPage.css";
 
@@ -46,7 +47,7 @@ function RegisterPage() {
       await authAPI.register(registerData);
 
       setSuccess(true);
-      // Przekieruj do logowania po 3 sekundach
+      //przekieruj po 3 sekundach
       setTimeout(() => navigate("/login"), 3000);
     } catch (err) {
       console.error("Registration error:", err);
@@ -183,7 +184,7 @@ function RegisterPage() {
               (window.location.href = "http://localhost:3001/api/auth/strava")
             }
           >
-            <span></span> Zarejestruj przez Stravę
+            <Zap size={20} /> Zarejestruj przez Stravę
           </button>
         </div>
       </div>

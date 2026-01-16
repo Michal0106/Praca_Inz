@@ -887,7 +887,7 @@ console.log("pace calc", {
 function avgPaceFromPerKm(perKm) {
   if (!Array.isArray(perKm) || perKm.length === 0) return null;
 
-  const valid = perKm.filter((v) => Number.isFinite(v) && v > 0 && v < 20);
+  const valid = perKm.filter((v) => Number.isFinite(v) && v > 0 && v < 50);
   if (valid.length === 0) return null;
 
   const mean = valid.reduce((s, v) => s + v, 0) / valid.length;

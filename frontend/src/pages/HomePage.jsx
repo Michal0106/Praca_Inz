@@ -1,4 +1,4 @@
-import { Activity, TrendingUp } from "lucide-react";
+import { Activity, TrendingUp, Calendar, MessageSquare, GitCompare } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import "./HomePage.css";
 
@@ -49,10 +49,24 @@ function HomePage() {
             <p>Śledź swoje osiągnięcia i najlepsze wyniki</p>
           </div>
           <div className="feature-card">
-            <span style={{ fontSize: "40px" }}></span>
+            <Calendar size={40} />
             <h3>Plan Treningowy</h3>
             <p>
               Otrzymaj spersonalizowany plan dopasowany do Twoich możliwości
+            </p>
+          </div>
+          <div className="feature-card">
+            <MessageSquare size={40} />
+            <h3>Asystent AI</h3>
+            <p>
+              Porozmawiaj z AI o swoim treningu i otrzymaj personalizowane porady
+            </p>
+          </div>
+          <div className="feature-card">
+            <GitCompare size={40} />
+            <h3>Porównaj Treningi</h3>
+            <p>
+              Porównaj dwa treningi i analizuj różnice w wydajności
             </p>
           </div>
         </div>

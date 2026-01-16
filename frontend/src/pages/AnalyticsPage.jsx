@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { BarChart3 } from "lucide-react";
 import Layout from "../components/Layout";
 import GlobalFilters from "../components/GlobalFilters";
 import { useFilters } from "../context/FilterContext";
@@ -29,9 +30,7 @@ function AnalyticsPage() {
   const [cache, setCache] = useState({});
 
   useEffect(() => {
-    // keep state in sync with back/forward navigation
     const p = searchParams.get("panel") || null;
-    // if URL points to a removed/unknown panel, close it
     const allowed = new Set(["ramp", "ef", "time", "heatmap", "yoy"]);
     setOpenId(p && allowed.has(p) ? p : null);
   }, [searchParams]);
@@ -104,7 +103,11 @@ function AnalyticsPage() {
   return (
     <Layout>
       <div className="analytics-page">
-        <h1>Analiza treningów</h1>
+        <div className="analytics-header">
+          <BarChart3 size={32} className="analytics-header-icon" />
+          <h1 className="analytics-header-title">Analiza treningów</h1>
+        </div>
+
 
         <GlobalFilters showMetric={false} />
 

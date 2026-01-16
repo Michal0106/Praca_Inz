@@ -225,7 +225,6 @@ const inferIntervalUnit = (block) => {
   const distanceKm = Number(block?.distance);
   const durationMin = Number(block?.duration);
 
-  // Prefer "clean" meter distances (400/800/1000/1200/1600/2000/3000) if close.
   if (Number.isFinite(distanceKm) && distanceKm > 0) {
     const meters = distanceKm * 1000;
     const common = [200, 300, 400, 600, 800, 1000, 1200, 1600, 2000, 3000];
@@ -238,7 +237,6 @@ const inferIntervalUnit = (block) => {
       return { unit: "distance", value: best.c }; // meters
     }
 
-    // Any reasonably "round" distance in 100m steps
     const rounded100 = Math.round(meters / 100) * 100;
     if (Math.abs(meters - rounded100) <= 35 && rounded100 >= 100 && rounded100 <= 5000) {
       return { unit: "distance", value: rounded100 };
@@ -259,14 +257,12 @@ const generateTitleFromBlocks = (workoutType, blocksRaw) => {
   const mainBlocks = blocks.filter((b) => !["warmup", "cooldown"].includes(b?.type));
   if (mainBlocks.length === 0) return null;
 
-  // Build candidate interval sets from alternating intervals+recovery blocks
   const candidates = [];
   let i = 0;
   while (i < mainBlocks.length - 1) {
     const a = mainBlocks[i];
     const b = mainBlocks[i + 1];
     if (a?.type === "intervals" && b?.type === "recovery") {
-      // Try explicit repetitions if present
       const reps = Number.isFinite(Number(a?.repetitions)) ? Math.max(1, Number(a.repetitions)) : null;
       const intervalUnit = inferIntervalUnit(a);
       const recoveryUnit = inferIntervalUnit(b);
@@ -285,7 +281,6 @@ const generateTitleFromBlocks = (workoutType, blocksRaw) => {
         continue;
       }
 
-      // Otherwise count repeated pairs with same signature
       let count = 1;
       let j = i + 2;
       while (j + 1 < mainBlocks.length) {
@@ -316,7 +311,6 @@ const generateTitleFromBlocks = (workoutType, blocksRaw) => {
   }
 
   if (candidates.length > 0) {
-    // Choose the main set with highest work-time score
     const best = candidates.reduce((acc, c) => (c.score > acc.score ? c : acc), candidates[0]);
     const iu = inferIntervalUnit(best.interval);
     const ru = inferIntervalUnit(best.recovery);
@@ -331,7 +325,6 @@ const generateTitleFromBlocks = (workoutType, blocksRaw) => {
     return `${best.count}x(${intervalLabel}${paceLabel} + ${recoveryLabel} rec)`;
   }
 
-  // No intervals+recovery pattern: use the most "important" single block.
   const primary =
     mainBlocks.find((b) => b?.type === "tempo") ||
     mainBlocks.find((b) => b?.type === "main") ||
