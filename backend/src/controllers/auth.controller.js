@@ -733,7 +733,7 @@ export const googleCallback = async (req, res) => {
       return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/account?google=error&reason=no_state`);
     }
 
-    const userId = state; // userId przekazany w state
+    const userId = state; 
 
     // Wymień kod na tokeny
     const tokens = await googleService.exchangeCodeForTokens(code);
@@ -744,7 +744,6 @@ export const googleCallback = async (req, res) => {
       googleTokenExpiresAt: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
     };
 
-    // IMPORTANT: Google often omits refresh_token on repeated consent. Do NOT wipe existing refresh token.
     if (tokens.refresh_token) {
       updateData.googleRefreshToken = tokens.refresh_token;
     }
@@ -793,7 +792,6 @@ export const unlinkGoogle = async (req, res) => {
   }
 };
 
-// ==================== STRAVA CREDENTIALS ====================
 
 export const updateStravaCredentials = async (req, res) => {
   try {
@@ -847,11 +845,9 @@ export const getStravaCredentials = async (req, res) => {
       return res.status(404).json({ error: 'Użytkownik nie znaleziony' });
     }
 
-    // Zwróć tylko informację czy są ustawione, nie same wartości (bezpieczeństwo)
     res.json({
       hasClientId: !!user.stravaClientId,
       hasClientSecret: !!user.stravaClientSecret,
-      // Opcjonalnie można zwrócić zamaskowane wartości
       clientIdPreview: user.stravaClientId 
         ? `${user.stravaClientId.substring(0, 4)}...` 
         : null,

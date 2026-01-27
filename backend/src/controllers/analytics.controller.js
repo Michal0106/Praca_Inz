@@ -639,9 +639,6 @@ export const compareActivities = async (req, res) => {
   }
 };
 
-// -----------------------------
-// New analytics endpoints (Stage 3)
-// -----------------------------
 
 const parseDateParam = (value) => {
   if (!value) return null;
@@ -651,15 +648,14 @@ const parseDateParam = (value) => {
 
 const isoDayKeyUTC = (date) => {
   const d = new Date(date);
-  return d.toISOString().slice(0, 10); // YYYY-MM-DD (UTC)
+  return d.toISOString().slice(0, 10); // YYYY-MM-DD
 };
 
-// ISO week starts Monday (UTC)
 const isoWeekStartUTC = (date) => {
   const d = new Date(date);
   const utc = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-  const day = utc.getUTCDay(); // 0..6 (Sun..Sat)
-  const diff = day === 0 ? -6 : 1 - day; // move to Monday
+  const day = utc.getUTCDay(); 
+  const diff = day === 0 ? -6 : 1 - day; 
   utc.setUTCDate(utc.getUTCDate() + diff);
   utc.setUTCHours(0, 0, 0, 0);
   return utc;
@@ -865,7 +861,7 @@ export const getAerobicEfficiency = async (req, res) => {
     const points = [];
     for (const a of activities) {
       const hr = a.averageHeartRate;
-      const speed = a.averageSpeed; // m/s
+      const speed = a.averageSpeed; 
       if (!hr || !speed || hr <= 0 || speed <= 0) continue;
       if (mode === "easy" && hr > maxHr) continue;
       const speedKmh = speed * 3.6;
@@ -901,8 +897,6 @@ export const getTimePatterns = async (req, res) => {
     const userId = getUserId(req);
     const { type } = req.query;
     const metric = clampStrEnum(req.query.metric, ["count", "speed", "ef", "load"], "count");
-    // JS getTimezoneOffset() gives minutes behind UTC (e.g. CET winter is -60? actually +60 => -60?),
-    // but we only need a consistent shift from client; frontend passes its getTimezoneOffset().
     const tzOffsetMinutes = Number.isFinite(Number(req.query.tzOffsetMinutes))
       ? Number(req.query.tzOffsetMinutes)
       : 0;
@@ -944,17 +938,14 @@ export const getTimePatterns = async (req, res) => {
       samples: 0,
     }));
 
-    // dayOfWeek: 0..6 (Mon..Sun) for UX
     const heatmap = Array.from({ length: 7 }, (_, dow) => ({
       dow,
       hours: Array.from({ length: 24 }, (_, hour) => ({ hour, count: 0 })),
     }));
 
-    const dowMap = (utcDay) => (utcDay === 0 ? 6 : utcDay - 1); // Sun->6, Mon->0 ...
+    const dowMap = (utcDay) => (utcDay === 0 ? 6 : utcDay - 1);
 
     for (const a of activities) {
-      // Convert to client-local time using tzOffsetMinutes (same semantics as Date.getTimezoneOffset()).
-      // local = utc - offsetMinutes
       const shifted = new Date(a.startDate.getTime() - tzOffsetMinutes * 60 * 1000);
       const hour = shifted.getUTCHours();
       const dow = dowMap(shifted.getUTCDay());
@@ -1187,8 +1178,6 @@ export const getPerformanceCurve = async (req, res) => {
       return best != null ? round(best, 2) : null;
     };
 
-    // Fallback: if PaceDistance is missing (user didn't fetch details), use Strava bestEfforts JSON if present.
-    // bestEfforts contains objects with { distance, elapsed_time } (seconds) for best segments inside an activity.
     const bestFromBestEfforts = async (targetMeters) => {
       const acts = await prisma.activity.findMany({
         where: {
@@ -1209,7 +1198,6 @@ export const getPerformanceCurve = async (req, res) => {
           const dist = Number(e?.distance);
           const t = Number(e?.elapsed_time);
           if (!Number.isFinite(dist) || !Number.isFinite(t) || dist <= 0 || t <= 0) continue;
-          // accept within 2% tolerance
           if (Math.abs(dist - targetMeters) / targetMeters > 0.02) continue;
           const pace = (t / 60) / (dist / 1000);
           if (!Number.isFinite(pace) || pace <= 0 || pace > 20) continue;

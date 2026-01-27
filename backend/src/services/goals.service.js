@@ -6,7 +6,6 @@ function round1(x) {
 }
 
 export async function computeGoalProgress(userId, goal) {
-  // SQL
   const results = await prisma.$queryRaw`
     SELECT * FROM compute_goal_progress(${userId}, ${goal.id})
   `;
@@ -79,7 +78,6 @@ export async function createNewGoal(userId, { type, period, target }) {
   const now = new Date();
   const { windowStart, windowEnd } = getWindow(period, now);
 
-  // SQL
 await prisma.$executeRaw`
   CALL create_new_goal(
     ${userId}::text,

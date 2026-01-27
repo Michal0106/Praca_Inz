@@ -99,17 +99,14 @@ export const getOrCreateTaskList = async (userId, title, existingTaskListId = nu
       const res = await tasks.tasklists.get({ tasklist: existingTaskListId });
       return res.data;
     } catch (e) {
-      // fallthrough and create new list
     }
   }
 
-  // Try to find by title (best-effort; title is not guaranteed unique)
   try {
     const listRes = await tasks.tasklists.list({ maxResults: 100 });
     const existing = (listRes.data.items || []).find((l) => l.title === title);
     if (existing) return existing;
   } catch {
-    // ignore
   }
 
   const created = await tasks.tasklists.insert({
@@ -130,7 +127,6 @@ export const upsertTask = async (userId, taskListId, taskId, taskData) => {
       });
       return res.data;
     } catch (e) {
-      // fallthrough to create
     }
   }
 

@@ -49,7 +49,6 @@ function GlobalFilters({
   };
 
   const handleEndDateChange = (e) => {
-    // normalize to end of day (local) to include the whole day in API filters
     const newEnd = e.target.value
       ? (() => {
           const d = new Date(e.target.value);

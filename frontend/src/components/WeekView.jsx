@@ -9,7 +9,7 @@ function WeekView({ week, onWorkoutClick, onWorkoutMove, onAddWorkout, onWorkout
   const [showDayModal, setShowDayModal] = useState(false);
   const [selectedDay, setSelectedDay] = useState(null);
   const [dragOverWorkout, setDragOverWorkout] = useState(null);
-  const [hoverTip, setHoverTip] = useState(null); // { lines, left, top, placement, width }
+  const [hoverTip, setHoverTip] = useState(null); 
   const [isExpanded, setIsExpanded] = useState(() => {
     const saved = localStorage.getItem(`week-${week?.id}-expanded`);
     return saved !== null ? JSON.parse(saved) : true;
@@ -80,7 +80,6 @@ function WeekView({ week, onWorkoutClick, onWorkoutMove, onAddWorkout, onWorkout
     const cooldown = blocks.findLast ? blocks.findLast((b) => b?.type === "cooldown") : [...blocks].reverse().find((b) => b?.type === "cooldown");
     const main = blocks.filter((b) => !["warmup", "cooldown"].includes(b?.type));
 
-    // find first interval+recovery pattern and count repeats
     let mainLine = null;
     for (let i = 0; i < main.length - 1; i++) {
       const a = main[i];
@@ -125,7 +124,6 @@ function WeekView({ week, onWorkoutClick, onWorkoutMove, onAddWorkout, onWorkout
     const intervals = parseIntervals(workout?.intervals);
     if (!intervals) return null;
     if (intervals.blocks) return summarizeBlocks(intervals.blocks);
-    // legacy string format
     const lines = [];
     if (intervals.warmup) lines.push(`Rozgrzewka: ${intervals.warmup}`);
     if (intervals.main || intervals.intervals) lines.push(intervals.main || intervals.intervals);
@@ -149,7 +147,7 @@ function WeekView({ week, onWorkoutClick, onWorkoutMove, onAddWorkout, onWorkout
 
     const left = clamp(rect.left, margin, window.innerWidth - width - margin);
     const preferBelowTop = rect.bottom + 10;
-    const estimatedHeight = 110; // 3 short lines + padding
+    const estimatedHeight = 110; 
     const fitsBelow = preferBelowTop + estimatedHeight <= window.innerHeight - margin;
     const placement = fitsBelow ? "below" : "above";
     const top = placement === "below" ? preferBelowTop : rect.top - 10;

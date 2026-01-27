@@ -2,7 +2,7 @@
 
 **System webowy do planowania, monitorowania i analizy treningów biegowych z integracją zewnętrznych platform (Strava, Google) oraz sztucznej inteligencji (OpenAI).**
 
-**Autor:** Michał Mróz - Praca Inżynierska PJATK
+**Autor:** Michał Mróz, Olivier Kopała - Praca Inżynierska PJATK
 
 ---
 

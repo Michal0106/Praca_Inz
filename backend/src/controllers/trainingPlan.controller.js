@@ -466,7 +466,6 @@ const validateAndFixWorkout = (workout) => {
         fixed.name = `${mainTitle}${distSuffix}${durSuffix}`.trim();
       }
 
-      // Normalize stored intervals format
       fixed.intervals = { blocks: intervalsData.blocks };
     } else {
       const calculatedDistance = calculateTotalDistance(fixed.intervals);
@@ -484,7 +483,6 @@ const validateAndFixWorkout = (workout) => {
   }
   
   if (fixed.workoutType !== 'REST') {
-    // If name wasn't rebuilt from blocks, keep legacy suffix behavior.
     if (!fixed.name || !fixed.name.includes("km") || !fixed.name.includes("min")) {
       let baseName = (fixed.name || "").replace(/\s*\d+(?:\.\d+)?km/i, '').replace(/\s*\(\d+min\)\s*$/i, '').trim();
       if (!baseName) baseName = fixed.workoutType || "Trening";
@@ -1244,7 +1242,6 @@ const buildTaskNotes = (workout) => {
   if (intervalsData?.blocks && Array.isArray(intervalsData.blocks) && intervalsData.blocks.length) {
     notes += (notes ? "\n\n" : "") + "📊 Struktura treningu:\n" + intervalsData.blocks.map(formatBlockLine).join("\n");
   } else if (workout.intervals) {
-    // legacy
     try {
       const intervals = typeof workout.intervals === "string" ? JSON.parse(workout.intervals) : workout.intervals;
       const lines = [];
@@ -1269,7 +1266,6 @@ const buildTaskNotes = (workout) => {
 };
 
 const toDueIsoForDate = (date) => {
-  // Store due as midnight UTC for the given day to keep "date-only" semantics stable across timezones.
   const y = date.getFullYear();
   const m = date.getMonth();
   const d = date.getDate();
@@ -1548,7 +1544,6 @@ export const deleteTrainingPlan = async (req, res) => {
       return res.status(404).json({ error: "Training plan not found" });
     }
 
-    // Google Tasks cleanup: delete whole tasklist if we own it for this plan
     if (plan.syncedToGoogleTasks && plan.googleTaskListId) {
       console.log(`[Delete Plan] Plan was synced to Google Tasks, removing task list...`);
       const user = await prisma.user.findUnique({
@@ -1566,7 +1561,6 @@ export const deleteTrainingPlan = async (req, res) => {
       }
     }
 
-    // Legacy Google Calendar cleanup (kept for backwards compatibility / already-synced plans)
     if (plan.syncedToCalendar) {
       console.log(`[Delete Plan] Plan was synced to calendar, removing events...`);
       
@@ -1983,12 +1977,11 @@ export const syncPlanToCalendarLegacy = async (req, res) => {
     const errors = [];
     
     const totalWorkouts = plan.weeks.flatMap(w => w.workouts).filter(w => w.workoutType !== 'REST').length;
-    const estimatedTime = Math.ceil(totalWorkouts * 0.15); // 150ms per workout
+    const estimatedTime = Math.ceil(totalWorkouts * 0.15); 
     console.log(`[Sync Calendar] Syncing ${totalWorkouts} workouts (estimated ${estimatedTime}s)...`);
 
     let startDate;
     if (customStartDate) {
-      // Użyj daty podanej przez użytkownika
       startDate = new Date(customStartDate);
       console.log(`[Sync Calendar] Using custom start date: ${startDate.toISOString()}`);
     } else if (plan.targetRaceDate) {
@@ -2158,7 +2151,6 @@ export const updateWorkout = async (req, res) => {
       return res.status(403).json({ error: 'Unauthorized' });
     }
 
-    // Aktualizuj workout (single source of truth: if blocks exist, recompute title/targets deterministically)
     const candidate = {
       name,
       description,
@@ -2182,7 +2174,6 @@ export const updateWorkout = async (req, res) => {
       },
     });
 
-    // Przelicz sumy dla tygodnia
     const weekWorkouts = await prisma.planWorkout.findMany({
       where: { planWeekId: workout.planWeekId },
     });
@@ -2273,7 +2264,6 @@ export const recomputePlanWorkouts = async (req, res) => {
   }
 };
 
-// Dodaj nowy trening do planu
 export const addWorkoutToPlan = async (req, res) => {
   try {
     const { planId } = req.params;
